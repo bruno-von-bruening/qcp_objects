@@ -211,7 +211,7 @@ class interaction_map(interaction_map_data):
         #    if scalars.shape[0]!=grid_points.shape[0]:
         #        raise Exception(f"Sizes dont match: {scalars.shape[0]} {grid_points.shape[0]}\n{inp}")
         #    dic.update(dict(scalars=scalars))
-    def __init__(self,inp, scalars:mynpar|None=None, energy_units:str|None=None):#, charge_violation=None):#length_units:str|None=None, charge_violation:int=None):
+    def __init__(self,inp, scalars:mynpar|None=None, energy_units:str|None=None, charge_violation: float|None=None):#, charge_violation=None):#length_units:str|None=None, charge_violation:int=None):
         """ If instance of class has been provided just load the old class,
         other type should be packed in the correct dictinoary type"""
 

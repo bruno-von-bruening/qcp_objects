@@ -1,0 +1,11 @@
+name: qcPROP
+channels:
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pydantic
+  - numpy
+  - pyyaml
+  - pip:
+    - rdkit
