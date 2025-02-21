@@ -1,0 +1,13 @@
+files:
+  map: test.map.json
+results:
+  statistical_indicators:
+    abs: 6.909864910272103
+    abs_rel_avr: 6.902297263854734
+    avr: -0.268428869980778
+    max: 15.221922463808683
+    max_rel_avr: 15.49035133378946
+    min: -10.530167436665197
+    min_rel_avr: -10.26173856668442
+    rms: 7.850517609015817
+    rms_rel_avr: 7.850517609015817

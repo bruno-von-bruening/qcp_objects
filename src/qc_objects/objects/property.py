@@ -1,5 +1,6 @@
 from . import *
 from .grids import molecular_isodensity_grid
+import copy
 
 class geometry():
     ifi=None
@@ -443,6 +444,8 @@ class multipoles(multipoles_data):
                     max_rank=int(ranks.replace('max',''))
                     do_ranks=[ [x for x in y if x<=max_rank] for y in self.ranks_list
                               ]
+                elif ranks in [ 'all' , 'all_available' ]:
+                    do_ranks=copy.deepcopy(self.ranks_list)
                 else: raise Exception(f"Provided key ranks=\'{ranks}\', which is unkown")
             elif isinstance(ranks, (list, np.ndarray)):
                 do_ranks=[]
