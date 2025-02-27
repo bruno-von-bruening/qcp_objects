@@ -238,7 +238,7 @@ class interaction_map(interaction_map_data):
             del inp[energy_units_key]
         
         # Initialize class
-        super().__init__(inp=inp, scalars=scalars, energy_units=energy_units)
+        super().__init__(inp=inp, scalars=scalars, energy_units=energy_units, charge_violation=charge_violation)
     def gen_statistical_indicators(self):
         self.statistics=statistical_indicators(self.scalars)
         return self.statistics.model_dump()
