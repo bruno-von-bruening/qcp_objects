@@ -8,19 +8,19 @@ class file_reader():
     dic={}
     # Init function checks if file exists reads in the line from file
     def __init__(self, inp_fi):
-        fi=os.path.realpath(inp_fi)
-        if not os.path.isfile(fi):
-            raise Exception(f"Not an existing file: \"{fi}\"")
-        self.input_file=fi
+        from qc_utils.file_handling import temporary_file
+
+        self.input_file=inp_fi
+        if self.input_file.endswith('.xz'):
+            import lzma
+            lines=lzma.open(self.input_file, encoding='utf-8', mode='rt').read()
+        else:
+            with open(self.input_file, encoding='utf-8-sig', errors='ignore') as rd:
+                lines=rd.read()
         
-        self.lines=[]
-        with open(fi, encoding='utf-8-sig', errors='ignore') as rd:
-            lines=rd.read()
-            lines=lines.split('\n')
-            for line in lines:
-                self.lines.append(line.rstrip('\n'))
+        self.lines=[ l.rstrip('\n') for l in lines.split('\n') ]
         if len(self.lines)<1:
-            raise Exception(f"Empty File: \"{fi}\"")
+            raise Exception(f"Empty File: \"{self.input_file}\"")
     @property
     def lines_no(self):
         if type(self.lines)==type(None):
@@ -43,7 +43,7 @@ class file_reader():
 
         if type(self.comtag)==type(None):
             raise Exception(f"Comment tag is not defined, define as \' self.comtag \'"+
-                    "\n in case you do not want to declare com tag provide emptyr list \'[]\'")
+                    "\n in case you do not want to declare com tag provide empty list \'[]\'")
         else:
             self._lines_nocom=self.lines
             for comtag in self.comtag:
@@ -408,6 +408,94 @@ class json_reader():
         
             
 
+
+
+class fchk_reader(file_reader):
+    comtag=[]
+    atomic_numbers = []
+    number_of_atoms = -1
+    coordinates = []
+    charge=None
+    def __init__(self, inp_fi):
+        # loads content of file and structures it into list
+        super().__init__(inp_fi)
+        self.extract_data()
+    def extract_data(self):
+        # Read the file
+
+        # Numbered lines with truncated comments as process by partent
+        lines_no=self.lines_nocom
+
+        # Get all lines with text
+        text_line_search=r'^[A-Z]'
+        line_idx_text= self.get_line_no(match=text_line_search)
+        
+        self.charge=self.get_line_item(self.get_line_no(match='Charge',single=True), tot_leng=3, data_type=int, get_item=2)
+        self.number_of_atoms=self.get_line_item(self.get_line_no(match='Number of atoms', single=True), tot_leng=5, get_item=4, data_type=int)
+        block_ranges=[ [x,None] for x in line_idx_text ]
+        for i,t in enumerate(line_idx_text):
+            if i<len(line_idx_text)-1:
+                next_num= line_idx_text[i+1]
+            else:
+                next_num=-1
+            block_ranges[i][1]=next_num
+
+        # Get the nuclear charges
+        nuc_srch={'srch_str':'Atomic numbers', 'format':'int', 'target':"atomic_numbers"}
+        coords_srch={'srch_str':'Current cartesian coordinates', 'format':'float_-1x3', 'target':"coordinates"}
+        if not self.search_block(nuc_srch, block_ranges):
+            raise Exception()
+        if not self.search_block(coords_srch, block_ranges):
+            raise Exception()
+        
+        assert len(self.coordinates)>0
+        assert len(self.atomic_numbers)>0
+    @validate_call
+    def search_block(self,srch_di:dict, blocks:List[List[int]]):
+        """ For Gaussian FCHK Files, find line that contain search string in provided list of lines
+        then tries to convert to the right format (type and shape eg -1x3 for [:,3]) and saves in the class under traget
+        string"""
+        srch_str=srch_di['srch_str']
+        format=srch_di['format']
+        target=srch_di['target']
+
+        the_block=[ (start,end)  for start,end in blocks if re.match(srch_str, self.lines[start])]
+        assert len(the_block)==1, f"No block found for search: {srch_str} in file {self.input_file}"
+        start,end=the_block[0]
+        assert end>start+1, f"End and start are adjacent: {start}:{end} (srch_str={srch_str})"
+
+        content=self.lines[start+1:end]
+
+        # Read in in right format
+        list_tmp=[]
+        for l in content:
+            tmp=l.strip().split()#['text'].strip().split()
+            if len(format.split('_'))==2:
+                format_type, dimension=format.split('_')
+                dimension=tuple([int(x) for x in dimension.split('x')])
+            else:
+                format_type=format
+                dimension=None
+            conversion_di={'float':float, 'int':int,'str':str}
+            if format_type not in conversion_di.keys():
+                raise Exception(f"Conversion methods for requested format \'{format}\' not defined")
+            try:
+                tmp=[conversion_di[format_type](x) for x in tmp]
+                list_tmp+=tmp
+            except Exception as e:
+                raise Exception(f"Could not read {format_type} line number {l}:\n{e}")
+        
+        if dimension!=None:
+            list_tmp=np.array(list_tmp).reshape(dimension)
+
+        # If number of atoms not define set it, otherwise check if this agrees
+        if self.number_of_atoms==None:
+            self.number_of_atoms=len(list_tmp)
+        if len(list_tmp)!=self.number_of_atoms:
+            raise Exception(f"Searched for {srch_str}, found {len(list_tmp)} items but number of atoms was previously defined as " \
+            f"{self.number_of_atoms}")
+        setattr(self, target, list_tmp )
+        return True
 
 
 

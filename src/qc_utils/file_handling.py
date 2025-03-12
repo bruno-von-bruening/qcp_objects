@@ -131,7 +131,7 @@ class temporary_file(temporary_file_base):
             which=choice.src
         # Assert the file lies in this directory and it exists
         if tmp_file is not None:
-            assert os.path.relpath(os.path.dirname(os.path.realpath(tmp_file)),os.getcwd())=='.', f"Tmp_file should be dropped in this directory, tmp_file={tmp_file}"
+            assert os.path.relpath(os.path.dirname(os.path.realpath(tmp_file)),os.getcwd())=='.', f"Tmp_file should be dropped in this directory, tmp_file={tmp_file} {os.getcwd()}"
             assert os.path.isfile(tmp_file)
 
         return dict(
