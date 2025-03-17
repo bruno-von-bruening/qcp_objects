@@ -265,113 +265,6 @@ class read_map_file(file_reader):
             raise Exception(f"Could not interprete unit keys:\n{missing}")
         return ret_di
 
-class read_mom_file(file_reader):
-    tag_to_rank={ 0:'mon', 1:'dip', 2:'qad', 3:'oct', 4:'hxd'}
-    comtag=['!']
-    dic={}
-    atom_types=None
-    atom_coordinates=None
-    site_dmp_di=None
-    def __init__(self,inp_fi):
-        file_reader.__init__(self,inp_fi)
-        self.extract_data()
-    def extract_data(self):
-        """ The moment file is structure by a commented header and blocks describing sites """
-        # Orientation
-        empty_lines=self.get_line_no(match=r'[ -]*', fullmatch=True)
-        empty_lines+=self.get_line_no(match='', fullmatch=True)
-        empty_lines=sorted( list(set(empty_lines)) )
-        atom_lines=self.get_line_no(match=r'[A-Z][a-z]?[_]?[0-9]* ', fullmatch=False)
-        if len(atom_lines)<1:
-            raise Exception(f"Atom lines not found\n{self.input_file}")
-        # Check if atom lines were recognized correctly
-        for i,e in enumerate(empty_lines):
-            if i<len(empty_lines)-1:
-                # Skip if consecutive empty line
-                if empty_lines[i+1] == e+1:
-                    pass
-                # In case the document does not end after this line
-                elif e<len(self.lines)-1:
-                    if not e+1 in atom_lines:
-                        raise Exception(f"Line {e} is empty, Total lines {len(self.lines)}:\n{atom_lines}")
-            if i==len(empty_lines)-1:
-                if e!=len(self.lines)-1:
-                    raise Exception
-
-        # Get the atom blocks
-        atom_entries=[]
-        for a in atom_lines:
-            check=False
-            for e in empty_lines:
-                if e>a:
-                    atom_entries.append( self.lines_num_nocom[a:e])
-                    check=True
-                    break
-            if not check:
-                raise Exception()
-
-        # Process the intervals
-        atoms=[]
-        for atom in atom_entries:
-            # Read the first line containing meta data
-            num,atom_data_line=atom[0]
-            # Get coordinates
-            xyz=self.get_line_item(num, tot_leng=8, get_item=[1,2,3], data_type=float)
-            xyz=np.array(xyz)
-
-            # Get atom type
-            dummy=self.get_line_item(num, tot_leng=8, get_item=4)
-            if dummy!='Type':
-                raise Exception(f"Expected string \'Type\' at position 4:\n{line}")
-            else:
-                at_type=self.get_line_item(num, tot_leng=8, get_item=5)
-                if not re.match(r'[A-Z][a-z]?', at_type):
-                    raise Exception()
-
-            # Get the rank
-            dummy=self.get_line_item(num, tot_leng=8, get_item=6)
-            if dummy!='Rank':
-                raise Exception(f"Expected string \'Rank\' at position 6:\n{line}")
-            else:
-                rank=self.get_line_item(num, tot_leng=8, get_item=7)
-                if not re.match(r'[0-9]', rank):
-                    raise Exception(f"Invalid string for rank: {rank}")
-                else:
-                    rank=int(rank)
-            
-            # Get the moments
-            if len(atom)<2:
-                raise Exception(f"No line for moments (atom block ends after one line)\n{atom}")
-            # Get the moments as list of components
-            try:
-                moment_line=[ x[1].strip() for x in atom[1:] ]
-                moment_line=[ x.split('!')[0] for x in moment_line ]
-                moment_line=' '.join(moment_line).split()
-                moment_comps=[ float(x) for x in moment_line ]
-                moment_comps=np.array(moment_comps)
-            except Exception as e:
-                raise Exception(f"Could not read line:\n{atom[1:]}\n{e}")
-            # Split the moments
-            supposed_length_for_sph_rep=(rank+1)**2
-            if len(moment_comps)!=supposed_length_for_sph_rep:
-                print(f"Expected length of moment components as {supposed_length_for_sph_rep}, got: {len(moment_comps)}"+
-                        "\n{}".format('\n'.join([x[1] for x in atom])))
-            start=0
-            mom_di={}
-            for n in range(rank+1):
-                if not n in self.tag_to_rank.keys():
-                    raise Exception(f"Did not find key {n} in {self.tag_to_rank}")
-                k=self.tag_to_rank[n]
-                end=start+(n+1)*2-1
-                mom_di.update({k: np.array(moment_comps[start:end]) })
-                start=end
-
-            atoms.append({'atom_type':at_type, 'xyz':xyz, 'rank':rank, 'mom_di':mom_di})
-
-        self.atom_types=[ atom['atom_type'] for atom in atoms ]
-        self.atom_coordinates=[ atom['xyz'] for atom in atoms ]
-        self.site_ranks=[ atom['rank'] for atom in atoms ]
-        self.site_dmp_di= [atom['mom_di'] for atom in atoms ]
 
 class json_reader():
     def __init__(self, input):
@@ -408,18 +301,20 @@ class json_reader():
         
             
 
-
+class fchk_data(BaseModel):
+    atomic_numbers  : List[int] = []
+    number_of_atoms : int = Field(default=-1, ge=1)
+    coordinates     : List[List[float]]= []
+    charge          : int 
+    multiplicity    : int
 
 class fchk_reader(file_reader):
-    comtag=[]
-    atomic_numbers = []
-    number_of_atoms = -1
-    coordinates = []
-    charge=None
+    comtag          : List[str]=[]
+    fchk_data:fchk_data
     def __init__(self, inp_fi):
         # loads content of file and structures it into list
         super().__init__(inp_fi)
-        self.extract_data()
+        self.fchk_data=self.extract_data()
     def extract_data(self):
         # Read the file
 
@@ -430,8 +325,10 @@ class fchk_reader(file_reader):
         text_line_search=r'^[A-Z]'
         line_idx_text= self.get_line_no(match=text_line_search)
         
-        self.charge=self.get_line_item(self.get_line_no(match='Charge',single=True), tot_leng=3, data_type=int, get_item=2)
-        self.number_of_atoms=self.get_line_item(self.get_line_no(match='Number of atoms', single=True), tot_leng=5, get_item=4, data_type=int)
+        charge=self.get_line_item(self.get_line_no(match='Charge',single=True), tot_leng=3, data_type=int, get_item=2)
+        multiplicity=self.get_line_item(self.get_line_no(match='Multiplicity',single=True), tot_leng=3, data_type=int, get_item=2)
+        number_of_atoms=self.get_line_item(self.get_line_no(match='Number of atoms', single=True), tot_leng=5, get_item=4, data_type=int)
+        
         block_ranges=[ [x,None] for x in line_idx_text ]
         for i,t in enumerate(line_idx_text):
             if i<len(line_idx_text)-1:
@@ -443,13 +340,15 @@ class fchk_reader(file_reader):
         # Get the nuclear charges
         nuc_srch={'srch_str':'Atomic numbers', 'format':'int', 'target':"atomic_numbers"}
         coords_srch={'srch_str':'Current cartesian coordinates', 'format':'float_-1x3', 'target':"coordinates"}
-        if not self.search_block(nuc_srch, block_ranges):
-            raise Exception()
-        if not self.search_block(coords_srch, block_ranges):
-            raise Exception()
+        atomic_numbers= self.search_block(nuc_srch, block_ranges)
+        coordinates=self.search_block(coords_srch, block_ranges)
         
-        assert len(self.coordinates)>0
-        assert len(self.atomic_numbers)>0
+        assert len(coordinates)>0
+        assert len(atomic_numbers)>0
+        return fchk_data(
+            charge=charge, multiplicity=multiplicity, number_of_atoms=number_of_atoms, coordinates=coordinates, atomic_numbers=atomic_numbers
+        )
+
     @validate_call
     def search_block(self,srch_di:dict, blocks:List[List[int]]):
         """ For Gaussian FCHK Files, find line that contain search string in provided list of lines
@@ -487,15 +386,18 @@ class fchk_reader(file_reader):
         
         if dimension!=None:
             list_tmp=np.array(list_tmp).reshape(dimension)
+        return list_tmp
 
-        # If number of atoms not define set it, otherwise check if this agrees
-        if self.number_of_atoms==None:
-            self.number_of_atoms=len(list_tmp)
-        if len(list_tmp)!=self.number_of_atoms:
-            raise Exception(f"Searched for {srch_str}, found {len(list_tmp)} items but number of atoms was previously defined as " \
-            f"{self.number_of_atoms}")
-        setattr(self, target, list_tmp )
-        return True
+
+    @validate_call
+    def make_geometry(self):
+        dat=self.fchk_data
+        return {
+            'coordinates':dat.coordinates,
+            'atom_types': [ nuclear_charge_to_element_symbol(x) for x in dat.atomic_numbers ],
+            'multiplicity': dat.multiplicity,
+            'charge': dat.charge,
+        }
 
 
 

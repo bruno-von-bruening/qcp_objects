@@ -1,93 +1,105 @@
 #from . import *
+from . import *
 import json
 import numpy as np
+from qc_objects.file_readers.camcasp_reader import read_camcasp_solution, read_camcasp_basis
 
-class base_basis():
+class radial_atomic_basis(BaseModel):
+    exponent_scales         : List[List[float]]
+    exponent_orders         : List[List[float]]
+    normalizations          : List[List[float]]
+    length_of_contracted    : int|None=None
+    #
+    center                  : List[Tuple[float,float,float]]|None=None
+    coefficients            : List[float]|None=None
+    initial_coefficients    : List[float]|None=None
+
+    #angular_functions       : None=None
+    def check(self): # should check if all arrays have the same length
+        raise Exception(f"Not implemented yet")
+
+class radial_atomic_basis(radial_atomic_basis):
     """ Basis set for an atom type """
-    exponent_scales=None
-    exponent_orders=None
-    normalizations=None
-    angular_functions=None
-    coefficients=None
-    initial_coefficients=None
-    def __init__(self, inp, inp_type=None):
+    @validate_call
+    def __init__(self, inp:str|dict|radial_atomic_basis, inp_type=None):
+        # Make dict and then initialize
         if isinstance(inp,dict):
-            self.read_from_dict(inp)
+            dic=inp
+        elif isinstance(inp,radial_atomic_basis):
+            dic=inp.model_dump()
         elif isinstance(inp_type, str):
             if inp_type.upper()=='CAMCASP':
                 inp_dic=read_camcasp_basis(inp).dic
                 update_keys=[ 'exponent_scales', 'exponent_orders', 'normalizations' ]
+                dic=dict([ (k,inp_dic[k]) for k in inp_dic.keys()])
                 for k in update_keys:
                     setattr(self, k, inp_dic[k])
             else:
                 raise Exception(f"Type {inp_type} not implemented")
         else:
-            raise Exception(f"Have to provide string for \'inp_type\' atm {type(inp)}")
-    def read_from_dict(self,inp):
-        necessary_keys=['exponent_scales','normalizations','exponent_orders','coefficients']
-        available_keys=necessary_keys+['initials','initial_coefficients']
-        provided_keys=list(inp.keys())
-        line=""
-        for key in provided_keys:
-            if not key in available_keys:
-                line+=f"key \'{key}\' is not in available keys\n"
-        if line!='':
-            raise Exception(line+f"Available keys are {available_keys}")
-        for key in necessary_keys:
-            if not key in provided_keys:
-                raise Exception(f"key {key} not under keys of input dict {provided_keys}")
-            else:
-                setattr(self, key, inp[key])
-class radial_basis(base_basis):
-    def __init__(self, inp, inp_type=None):
-        super().__init__(inp, inp_type=inp_type)
-    def to_dict(self,keys=None, format=None):
-        at={
-            'exponent_scales': self.exponent_scales,
-            'exponent_orders': self.exponent_orders,
-            'coefficients': self.coefficients,
-            'initial_coefficients':self.initial_coefficients,
-            'normalizations': self.normalizations,
-        }
-        new_at={}
-        if type(keys)==type(None):
-            new_at=at
-        else:
-            for key in keys:
-                if key not in at.keys():
-                    raise Exception(f"Requestest key {key} not avaiable")
-                else:
-                    new_at.update({key: at[key]})
-        if isinstance(format, type(None)):
-            pass
+            raise Exception(f"")
+        super().__init__(**dic)
+        self.length_of_contracted=len(self.exponent_orders)
+        
 
-        cleaned_dic={}
-        for key in new_at.keys():
-            if isinstance(new_at[key], type(np.array([])) ):
-                cleaned_dic.update({key:new_at[key].tolist()})
-            else:
-                cleaned_dic.update({key:new_at[key]})
-        return cleaned_dic
+#class radial_basis(base_basis):
+#    def __init__(self, inp, inp_type=None):
+#        super().__init__(inp, inp_type=inp_type)
+#    def to_dict(self,keys=None, format=None):
+#        return self.model_dump()
+        # at={
+        #     'exponent_scales': self.exponent_scales,
+        #     'exponent_orders': self.exponent_orders,
+#        #     'coefficients': self.coefficients,
+#        #     'initial_coefficients':self.initial_coefficients,
+#        #     'normalizations': self.normalizations,
+        # }
+        # new_at={}
+        # if type(keys)==type(None):
+        #     new_at=at
+        # else:
+        #     for key in keys:
+        #         if key not in at.keys():
+        #             raise Exception(f"Requestest key {key} not avaiable")
+        #         else:
+        #             new_at.update({key: at[key]})
+        # if isinstance(format, type(None)):
+        #     pass
 
-class molecular_basis():
-    atom_types=None
-    basis_centers=None
-    _coordinates=None
-    num_sites=None
-    @property
-    def coordinates(self):
-       return self._coordinates
-    @coordinates.setter
-    def coordinates(self,value):
-        value=np.array(value)
-        shape=value.shape
-        if len(shape)!=2:
-            raise Exception()
-        if shape[1]!=3:
-            raise Exception(f"List of 3D coordinates, got:{value}")
-        self._coordinates=value
-    def __init__(self):
-        pass
+        # cleaned_dic={}
+        # for key in new_at.keys():
+        #     if isinstance(new_at[key], type(np.array([])) ):
+        #         cleaned_dic.update({key:new_at[key].tolist()})
+        #     else:
+        #         cleaned_dic.update({key:new_at[key]})
+        # return cleaned_dic
+
+class molecular_basis(BaseModel):
+    atom_types      : List[str]|None=None
+    basis_expansions: List[radial_atomic_basis]
+    centers         : List[Tuple[float,float,float]]
+    num_sites       : int=-1
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args,**kwargs)
+        self.num_sites=len(self.basis_expansions)
+        self.check_integrity()
+
+    def check_integrity(self):
+        try:
+            assert self.num_sites>0, f"Number of sites is not positive but {self.num_sites}"
+
+            if not self.atom_types is None:
+                assert len(self.atom_types)==self.num_sites
+            assert len(self.basis_expansions)==self.num_sites
+            if not self.centers is None:
+                assert len(self.centers)==self.num_sites
+
+        except Exception as ex:
+            raise Exception(f"Failed to validate integrity of {molecular_basis}: {ex}")
+class molecular_basis(molecular_basis):
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.check_integrity()
     def to_json(self, output_file=None):
         dic=self.to_dict()
         cleaned_dic={}
@@ -103,10 +115,8 @@ class molecular_basis():
             json.dump(cleaned_dic, wr)
         print(f"Printed {class_name} to {output_file}")
         return output_file
-
 class molecular_radial_basis(molecular_basis):
     def __init__(self,inp):
-        super().__init__()
         if isinstance(inp, str):
             if inp.endswith('.ISA'):
                 dic=self.isa_to_dict(inp)
@@ -118,24 +128,24 @@ class molecular_radial_basis(molecular_basis):
             pass
         else:
             raise Exception()
-        self.from_dict(dic)
+        super().__init__(**dic)
     def isa_to_dict(self, isa_file):
-        dic=read_camcasp_solution(inp).dic 
+        dic=read_camcasp_solution(isa_file).dic 
         atom_types=dic['atom_types']
-        teh_coordinates=dic['coordinates'] # coordinates interferes with method in inherited class
+        the_coordinates=dic['coordinates'] # coordinates interferes with method in inherited class
 
         atoms=dic['atoms']
         basis_centers=[]
         for at in atoms:
             dic={}
             [ dic.update({k:at[k]}) for k in ['exponent_scales','normalizations','exponent_orders','coefficients'] ]
-            atom=radial_basis(dic)
+            atom=radial_atomic_basis(dic)
             basis_centers.append(atom)
 
         return dict(
-            basis_centers=basis_centers,
+            basis_expansions=basis_centers,
             atom_types=atom_types,
-            coordinates=coordinates,
+            centers=the_coordinates,
         ) 
     def read_json(self, json_file):
         try:
@@ -145,36 +155,54 @@ class molecular_radial_basis(molecular_basis):
             atty_key='atom_types'
             shape_key='shape_functions'
             #num_keys=['exponent_scales','exponent_orders','normalizations','coefficients']
+    
 
             coordinates=data[coor_key]
             atom_types=data[atty_key]
             shape=data[shape_key]
+
+            # Initially this were just plain lists but we want list of list to enable contracted types
+            for s in shape:
+                keys=["exponent_orders", "exponent_scales",'normalizations']
+                for k in keys:
+                    if not isinstance(s[k][0], list):
+                        s[k]=[ [ss] for ss in s[k]]
+                initials=s['initials']
+                del s['initials']
+                s.update({'initial_coefficients':initials})
+
+
             return dict(
-                coordinates=coordinates,
+                centers=coordinates,
                 atom_types=atom_types,
-                shape_functions=shape,
+                basis_expansions=[ radial_atomic_basis(x) for x in shape],
             )
         except Exception as ex:
-            raise Exception(f"Cannot process json file {json_file}: {ex}")
+            raise Exception(f"Cannot process json file {json_file}: {str(ex)}")
 
-    def from_dict(self,dic):
-        mandatory_keys=['atom_types', 'coordinates', 'shape_functions']
-        available_keys=mandatory_keys
-        provided_keys=list(dic.keys())
-        self.basis_centers=[]
-        for key in provided_keys:
-            if not key in available_keys:
-                raise Exception(f"Provided unkown key {key}")
-            else:
-                if key in ['atom_types', 'coordinates']:
-                    setattr(self,key,dic[key])
-                elif key in ['shape_functions']:
-                    for shape_func in dic[key]:
-                        self.basis_centers.append( radial_basis(shape_func))
+    #def from_dict(self,dic):
+    #    mandatory_keys=['atom_types', 'coordinates', 'basis_expansions']
+    #    available_keys=mandatory_keys
+    #    provided_keys=list(dic.keys())
+    #    self.basis_expansions=[]
+    #    for key in provided_keys:
+    #        if not key in available_keys:
+    #            raise Exception(f"Provided unkown key {key}")
+    #        else:
+    #            if key in ['atom_types', 'coordinates']:
+    #                if key=='coordinates':
+    #                    the_key='centers'
+    #                else:
+    #                    the_key=key
+    #                setattr(self,the_key,dic[key])
+    #            elif key in ['shape_functions']:
+    #                for shape_func in dic[key]:
+    #                    self.basis_expansions.append( radial_atomic_basis(shape_func))
+    #    raise Exception(self)
     def to_dict(self):
         """ Save in Json format """
         dic={} ; atoms=[]
-        for i,b in enumerate(self.basis_centers):
+        for i,b in enumerate(self.basis_expansions):
             at_dic=b.to_dict()
             atoms.append(at_dic)
         dic={'shape_functions':atoms, 'coordinates':self.coordinates, 'atom_types':self.atom_types}
@@ -185,3 +213,4 @@ class molecular_radial_basis(molecular_basis):
             else:
                 cleaned_dic.update({key:dic[key]})
         return cleaned_dic
+    

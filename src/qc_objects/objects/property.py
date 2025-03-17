@@ -1,43 +1,26 @@
 from . import *
 from .grids import molecular_isodensity_grid
 import copy
+from qc_objects.file_readers.file_readers import fchk_reader
+from qc_global_utilities.encoding_and_conversion.constants import ANGSTROM_TO_BOHR, BOHR_TO_ANGSTROM
+from typing import Literal
+from qc_objects.file_readers.camcasp_reader import read_mom_file
 
-class geometry():
-    ifi=None
-    coordinates=None # allways save in Bohr
-    units={ "LENGTH": None } # Controls only input/output units
-    _internal_units={ "LENGTH":'BOHR' } # Controls only input/output units
-    atom_types=None
-    nuclear_charges=None
-    multiplicity=None
-    multiplicity_ion=None
-    charge=None
-    adjacency_matrix=None
-    angstrom_in_bohr=0.529177249 # from https://www.unitconverters.net/length/bohr-radius-to-angstrom.htm (Sep 15 2024)
-    def unit_handler(self, key):
-        ''' Return conversion factor for given unit '''
-        if not key in self._internal_units.keys():
-            raise Exception()
-        if not key in self.units.keys():
-            raise Exception()
-        internal_unit, output_unit= self._internal_units[key], self.units[key]
-        self.units[key]=None # Set this explicitly before requesting output, to make things clear!
-        
-        def unit_val(unit_key):
-            # Values in au
-            if unit_key.upper() in ["BOHR"]:
-                ret_unit=1.
-            elif unit_key.upper() in ['ANGSTROM','ANG']:
-                ret_unit=self.angstrom_in_bohr
-            else:
-                raise Exception(f"Unkown unit key: {unit_key}")
-            return ret_unit
+class my_units(BaseModel):
+    LENGTH: Literal['BOHR','ANGSTROM']
+    #energy: Literal['HARTREE','kJ']
+class geometry(BaseModel):
+    ifi: str|None=None
+    coordinates: List[List[float]]|None=None # allways save in Bohr
+    units: my_units # Controls only input/output units
+    _internal_units: my_units=my_units( LENGTH='BOHR' ) # Controls only input/output units
+    atom_types: List[str]|None=None
+    multiplicity:int=Field(default=None, ge=1 )
+    multiplicity_ion: int|None=Field(default=None, ge=1)
+    charge:int=0
+    adjacency_matrix:List[List[int]]|None=None
 
-        internal_unit_val=unit_val(internal_unit)
-        output_unit_val=unit_val(output_unit)
-    
-        conversion_factor= output_unit_val/internal_unit_val
-        return conversion_factor
+class geometry(geometry):
     @property
     def coordinates(self):
         ''' Coorindates are allways saved in Bohr, but are returned in current unit '''
@@ -62,6 +45,30 @@ class geometry():
 
         conversion=self.unit_handler('LENGTH')
         self._coordinates=coor/conversion
+    def unit_handler(self, key):
+        ''' Return conversion factor for given unit '''
+        if not key in self._internal_units.keys():
+            raise Exception()
+        if not key in self.units.keys():
+            raise Exception()
+        internal_unit, output_unit= self._internal_units[key], self.units[key]
+        self.units[key]=None # Set this explicitly before requesting output, to make things clear!
+        
+        def unit_val(unit_key):
+            # Values in au
+            if unit_key.upper() in ["BOHR"]:
+                ret_unit=1.
+            elif unit_key.upper() in ['ANGSTROM','ANG']:
+                ret_unit=ANGSTROM_TO_BOHR
+            else:
+                raise Exception(f"Unkown unit key: {unit_key}")
+            return ret_unit
+
+        internal_unit_val=unit_val(internal_unit)
+        output_unit_val=unit_val(output_unit)
+    
+        conversion_factor= output_unit_val/internal_unit_val
+        return conversion_factor
         
     def __init__(self,inp=None,coordinates=None, atom_types=None, length_units=None):
         if type(inp)==str:
@@ -71,13 +78,16 @@ class geometry():
             elif inp.endswith('.sdf'):
                 self.units['LENGTH']='ANGSTROM'
                 info_dict=read_sdf_file(inp)
+            elif inp.endswith('.fchk'):
+                kwargs=fchk_reader(inp).make_geometry()
+                kwargs.update({'units':{'LENGTH':'BOHR'}})
             else:
                 raise Exception(f"File format not handeled yet: {inp}")
-            self.coordinates=info_dict.coordinates
-            self.atom_types=info_dict.atom_types
-            self.charge=info_dict.charge
-            self.multiplicty=info_dict.multiplicity
-            self.units['LENGTH']='BOHR'
+            # self.coordinates=info_dict.coordinates
+            # self.atom_types=info_dict.atom_types
+            # self.charge=info_dict.charge
+            # self.multiplicty=info_dict.multiplicity
+            super().__init__(**kwargs)
         elif isinstance(inp, type(None)):
             if type(coordinates) != type(None):
                 if type(length_units)==type(None):
@@ -135,22 +145,21 @@ class geometry():
     @property
     def camcasp_coordinates_string(self):
         lines=[]
-        self.units.update({'LENGTH':'BOHR'})
-        lines+=[ "units {}".format(self.units['LENGTH']) ]
-        for coor, tag, at_ty, Z in zip(self.coordinates, self.camcasp_atom_tags, self.atom_types, self.nuclear_charges):
+        self.units.LENGTH='BOHR'
+        lines+=[ "units {}".format(self.units.LENGTH) ]
+
+        coords=self.coordinates
+        camcasp_atom_tags=self.camcasp_atom_tags
+        atom_types=self.atom_types
+        nuclear_charges=self.nuclear_charges
+        for coor, tag, at_ty, Z in zip( coords, camcasp_atom_tags, atom_types, nuclear_charges):
             line=' '.join(['{:<6} {:>5}']+3*["{:>12}"]+['Type {:<2}'])
             line=line.format(tag,f"{Z:.1f}", *[f"{x:.8f}" for x in coor], at_ty)
             lines.append(line)
         return '\n'.join(lines)
     @property
     def nuclear_charges(self):
-        nuclear_charges=[]
-        charge_di= m_dt.at_tag_to_Z
-        for at_ty in self.atom_types:
-            if not at_ty in charge_di.keys():
-                raise Exception(f"Atom type not found in dictionary:\n{at_ty} {charge_di}")
-            nuclear_charges.append(charge_di[at_ty])
-        return nuclear_charges
+        return [ element_symbol_to_nuclear_charge(x) for x in self.atom_types]
     def print_out(self, output_name=None, format='xyz'):
         if format=='xyz':
             self.units['LENGTH']='ANGSTROM'
@@ -352,7 +361,6 @@ class rotate_multipoles():
             monos, dipos, quads, octos, hexas
         ]
 
-from qc_objects.file_readers.file_readers import read_mom_file
 
 class multipoles_data(BaseModel):
     atom_types: List[str|int]
