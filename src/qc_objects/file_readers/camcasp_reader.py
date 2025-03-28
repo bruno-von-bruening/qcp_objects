@@ -197,7 +197,7 @@ class read_camcasp_basis(file_reader):
         for i, value_no in link_type_to_value.items():
             type_line=self.lines_nocom[i]
             if not re.match(r'^[ ]*[1][ ]*[s][ ]*$', type_line):
-                print(f"Line {type_line} not 1s function")
+                #print(f"Line {type_line} not 1s function")
                 continue
             for j in value_no:
                 value_line=self.lines[j]

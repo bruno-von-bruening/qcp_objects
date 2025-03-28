@@ -19,9 +19,11 @@ class radial_atomic_basis(BaseModel):
         raise Exception(f"Not implemented yet")
 
 class radial_atomic_basis(radial_atomic_basis):
-    """ Basis set for an atom type """
+    """ Basis set for an individual site
+    or more generically an specific atom type 
+    """
     @validate_call
-    def __init__(self, inp:str|dict|radial_atomic_basis, inp_type=None):
+    def __init__(self, inp:str|dict|radial_atomic_basis, inp_type:str|None=None):
         # Make dict and then initialize
         if isinstance(inp,dict):
             dic=inp
@@ -30,16 +32,40 @@ class radial_atomic_basis(radial_atomic_basis):
         elif isinstance(inp_type, str):
             if inp_type.upper()=='CAMCASP':
                 inp_dic=read_camcasp_basis(inp).dic
-                update_keys=[ 'exponent_scales', 'exponent_orders', 'normalizations' ]
-                dic=dict([ (k,inp_dic[k]) for k in inp_dic.keys()])
+                update_keys=[ 'exponent_scales', 'normalizations' ]
+                dic={}
                 for k in update_keys:
-                    setattr(self, k, inp_dic[k])
+                    if not k in inp_dic.keys():
+                        raise Exception(f"Key \'{k}\' is not in avaialable keys returned by {read_camcasp_basis}: {list(inp_dic.keys())}")
+                    else:
+                        # We need to reshape to accomodate contracted functions
+                        dic.update({k:[]})
+                        assert isinstance(inp_dic[k], list), f"Expected list for {k} in {inp}, got: {inp_dic[k]}"
+                        for x in inp_dic[k]:
+                            if isinstance(x, (float,int)):
+                                x=[x]
+                            elif isinstance(x, (list, tuple)):
+                                pass
+                            else: raise Exception(f"Found unkown type in {k} when reading {inp} via {read_camcasp_basis}: {x} ({type(x)})")
+                            dic[k].append(x)
+                # Camcasp does not give exponent orders but all basis sets are gaussians
+                dic.update({'exponent_orders': [[2] for x in dic['exponent_scales']]})
             else:
                 raise Exception(f"Type {inp_type} not implemented")
         else:
             raise Exception(f"")
         super().__init__(**dic)
         self.length_of_contracted=len(self.exponent_orders)
+    
+    def generate_horton_basis(self):
+        """ Generate dictionary needed for horton basis set definition """
+        # Do not need normalization (implicit in horton) and no coefficients (since basis set)
+        horton_mapper={
+            'exponents':self.exponent_scales,
+            'exponents_orders':self.exponent_orders,
+            'initials':np.array( [ 1./len(self.exponent_scales) for x in self.exponent_scales ] ).tolist(),
+        }
+        return horton_mapper
         
 
 #class radial_basis(base_basis):
