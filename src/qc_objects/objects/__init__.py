@@ -4,8 +4,9 @@ import json
 import os,sys, re
 import numpy as np
 
-from pydantic import validate_call, BaseModel, Field, PlainSerializer, BeforeValidator
-from typing import List, Annotated, Tuple
+from pydantic import validate_call, BaseModel, Field, PlainSerializer, BeforeValidator; val_call=validate_call(config=dict(arbitrary_types_allowed=True))
+from typing import List, Annotated, Tuple, Literal
+from annotated_types import Len
 def nd_array_before_validator(x):
     # custom before validation logic
     if isinstance(x, List):
