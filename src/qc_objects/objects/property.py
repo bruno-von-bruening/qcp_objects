@@ -1,7 +1,7 @@
 from . import *
 from .grids import molecular_isodensity_grid
 import copy
-from qc_objects.file_readers.file_readers import fchk_reader
+from qc_objects.file_readers.file_readers import fchk_reader, read_xyz_file
 from qc_global_utilities.encoding_and_conversion.constants import ANGSTROM_TO_BOHR, BOHR_TO_ANGSTROM
 from typing import Literal
 from qc_objects.file_readers.camcasp_reader import read_mom_file
@@ -15,9 +15,9 @@ class geometry(BaseModel):
     units: my_units # Controls only input/output units
     _internal_units: my_units=my_units( LENGTH='BOHR' ) # Controls only input/output units
     atom_types: List[str]|None=None
-    multiplicity:int=Field(default=None, ge=1 )
+    multiplicity:int|None=Field(default=None, ge=1 )
     multiplicity_ion: int|None=Field(default=None, ge=1)
-    charge:int=0
+    charge:int|None=Field(default=None)
     adjacency_matrix:List[List[int]]|None=None
 
 class geometry(geometry):
@@ -73,8 +73,8 @@ class geometry(geometry):
     def __init__(self,inp=None,coordinates=None, atom_types=None, length_units=None):
         if type(inp)==str:
             if inp.endswith('.xyz'):
-                info_dict=read_xyz_file(inp)
-                self.units['LENGTH']='ANGSTROM'
+                kwargs=read_xyz_file(inp).to_dict()
+                kwargs.update({'units':{'LENGTH':'ANGSTROM'}})
             elif inp.endswith('.sdf'):
                 self.units['LENGTH']='ANGSTROM'
                 info_dict=read_sdf_file(inp)
@@ -165,6 +165,13 @@ class geometry(geometry):
             self.units['LENGTH']='ANGSTROM'
             writer=xyz_writer(output_name, write=True, coordinates=self.coordinates, 
                     atom_types=self.atom_types, comment='Generated automatically')
+    @validate_call
+    def com(self, weighted:bool=False) -> Tuple[float, float, float]:
+        coords=np.array(self.coordinates)
+        charges=np.array(self.nuclear_charges)
+        if weighted: charges=np.sqrt(charges)
+        return np.sum([   [c/np.sum(charges)*coord] for c,coord in zip(charges,coords)   ], axis=0)[0]
+        #    , axis=0
     def to_dict(self):
         dic={
             'coordinates':self.coordinates.tolist(),

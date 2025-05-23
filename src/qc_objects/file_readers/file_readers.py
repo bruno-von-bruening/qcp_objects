@@ -463,6 +463,9 @@ class read_xyz_file(geometry_reader):
         coordinates=np.array(coordinates)
         self.atom_types=atom_types
         self.coordinates=coordinates
+    def to_dict(self):
+        keys=['coordinates','atom_types','num_sites','charge','multiplicity']
+        return dict([ (k,getattr(self,k)) for k in keys])
 class read_sdf_file(geometry_reader):
     comtag=[]
     comments=None
