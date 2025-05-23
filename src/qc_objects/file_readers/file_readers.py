@@ -463,6 +463,14 @@ class read_xyz_file(geometry_reader):
         coordinates=np.array(coordinates)
         self.atom_types=atom_types
         self.coordinates=coordinates
+    @validate_call
+    def make_geometry(self):
+        return {
+            'coordinates':self.coordinates,
+            'atom_types': self.atom_types,#[ nuclear_charge_to_element_symbol(x) for x in dat.atomic_numbers ],
+            'multiplicity': None,# dat.multiplicity,
+            'charge': None,#dat.charge,
+        }
 class read_sdf_file(geometry_reader):
     comtag=[]
     comments=None
