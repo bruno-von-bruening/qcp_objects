@@ -1,5 +1,5 @@
 #!/usr/bin/env
-import os
+import os, yaml
 
 home=os.path.realpath('..')
 
@@ -23,11 +23,17 @@ def  env_setup_instructions(env):
     # COuld also be done by just runnig cat and appending to right script
     print(instructions)
 
+def drop_to_yaml(whole_dic):
+    env_file='env_config.yaml'
+    with open(env_file, 'w') as wr:
+        yaml.safe_dump(whole_dic, wr)
+        string=yaml.safe_dump(whole_dic)
 
 def setup():
 
     env=setup_env_vars()
     env_setup_instructions(env)
+    drop_to_yaml(env)
 
 if __name__=='__main__':
     setup()
