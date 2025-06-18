@@ -1,7 +1,7 @@
 from . import *
 
 from typing import List
-from qc_objects.objects.property import multipoles as mom_cl
+from qc_objects.objects.properties import multipoles as mom_cl
 
 # import sys,os; sys.path.insert(1,os.environ["PY_MODULES"])
 # import itertools as it, copy, re, shutil, pickle, json

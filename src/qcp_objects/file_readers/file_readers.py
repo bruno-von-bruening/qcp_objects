@@ -8,7 +8,7 @@ class file_reader():
     dic={}
     # Init function checks if file exists reads in the line from file
     def __init__(self, inp_fi):
-        from qc_utils.file_handling import temporary_file
+        from qc_global_utilities.file_handling import temporary_file
 
         self.input_file=inp_fi
         if self.input_file.endswith('.xz'):
@@ -302,11 +302,16 @@ class json_reader():
             
 
 class fchk_data(BaseModel):
+    mode            : str|None=None # mode e.g. SP or FORCE
+    method          : str|None=None # electronic structure method used
+    basis           : str           # basis set used
     atomic_numbers  : List[int] = []
     number_of_atoms : int = Field(default=-1, ge=1)
     coordinates     : List[List[float]]= []
     charge          : int 
     multiplicity    : int
+    method          : str
+    basis           : str
 
 class fchk_reader(file_reader):
     comtag          : List[str]=[]
@@ -320,6 +325,14 @@ class fchk_reader(file_reader):
 
         # Numbered lines with truncated comments as process by partent
         lines_no=self.lines_nocom
+
+        # The first line is a comment the second is the header
+        def get_header(line):
+            ar=line.split()
+            assert len(ar)==3, f"Expected 3 entries on header line:\n   {line}"
+            return ar
+        header_line=lines_no[1] 
+        mode, method, basis = get_header(header_line)
 
         # Get all lines with text
         text_line_search=r'^[A-Z]'
@@ -346,6 +359,7 @@ class fchk_reader(file_reader):
         assert len(coordinates)>0
         assert len(atomic_numbers)>0
         return fchk_data(
+            mode=mode, method=method, basis=basis,
             charge=charge, multiplicity=multiplicity, number_of_atoms=number_of_atoms, coordinates=coordinates, atomic_numbers=atomic_numbers
         )
 

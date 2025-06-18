@@ -1,4 +1,4 @@
-name: qcPROP
+name: qcp_objects
 channels:
   - defaults
 dependencies:

@@ -78,12 +78,20 @@ class geometry(geometry):
     
         conversion_factor= internal_unit_val/output_unit_val
         return conversion_factor
-        
-    def __init__(self,inp=None,coordinates=None, atom_types=None, length_units=None):
+
+    @val_call 
+    def __init__(self,
+        inp:str|None=None,
+        coordinates:np.ndarray|None=None, 
+        atom_types:List[str|int]|None=None, 
+        length_units:str|None=None, 
+        charge:int=0, 
+        multiplicity:int=1
+    ):
         if type(inp)==str:
             if inp.endswith('.xyz'):
                 kwargs=read_xyz_file(inp).make_geometry()
-                kwargs.update({'units':{'LENGTH':'ANGSTROM'}, 'charge':0,'multiplicity':1})
+                kwargs.update({'units':{'LENGTH':'ANGSTROM'}, 'charge':charge,'multiplicity':multiplicity})
                 #self.units['LENGTH']='ANGSTROM'
             elif inp.endswith('.sdf'):
                 self.units['LENGTH']='ANGSTROM'
@@ -97,18 +105,17 @@ class geometry(geometry):
             # self.atom_types=info_dict.atom_types
             # self.charge=info_dict.charge
             # self.multiplicty=info_dict.multiplicity
-            super().__init__(**kwargs)
-            self._coordinates=np.array(kwargs['coordinates'])/self.internal_to_external_unit('LENGTH',self.units.LENGTH)
             # conversion=self.unit_handler(kwargs['units']['LENGTH'])
             # print(conversion)
             # kwargs['coordinates']*=1./conversion
             # kwargs.coordinates=self.coordinates
         elif isinstance(inp, type(None)):
+            kwargs={}
             if type(coordinates) != type(None):
                 if type(length_units)==type(None):
                     raise Exception(f"Need to provide length unit when coordinates are read in over options")
-                self.units['LENGTH']=length_units
-                self.coordinates=coordinates
+                kwargs.update({'units':{'LENGTH':'BOHR'}})
+                kwargs.update({'coordinates':coordinates})
             else:
                 raise Exception(f"No input file provided, need coordinates then")
             if type(atom_types) != type(None) :
@@ -120,12 +127,13 @@ class geometry(geometry):
                         tmp_at_ty.append(atomic_charge_to_atom_type(x))
                     else:
                         raise Exception(f"Unkown type {x}")
-                self.atom_types=tmp_at_ty
-
+                kwargs.update({'atom_types':tmp_at_ty})
             else:
                 raise Exception(f"No input file provided, need atom types then")
         else:
             raise Exception(inp)
+        super().__init__(**kwargs)
+        self._coordinates=np.array(kwargs['coordinates'])/self.internal_to_external_unit('LENGTH',self.units.LENGTH)
     def connec(self):
         #from rdkit.Chem import AllChem,rdDetermineBonds
         if type(self.ifi) != type(None):
