@@ -2,7 +2,7 @@
 from . import *
 import json
 import numpy as np
-from qc_objects.file_readers.camcasp_reader import read_camcasp_solution, read_camcasp_basis
+from qcp_objects.file_readers.camcasp_reader import read_camcasp_solution, read_camcasp_basis
 
 
 class radial_atomic_basis(BaseModel):

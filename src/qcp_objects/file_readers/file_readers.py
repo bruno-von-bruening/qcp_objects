@@ -1,4 +1,5 @@
 from . import *
+from qcp_global_utils.environment.file_handling import temporary_file
 
 class file_reader():
     lines=None
@@ -8,7 +9,6 @@ class file_reader():
     dic={}
     # Init function checks if file exists reads in the line from file
     def __init__(self, inp_fi):
-        from qc_global_utilities.file_handling import temporary_file
 
         self.input_file=inp_fi
         if self.input_file.endswith('.xz'):

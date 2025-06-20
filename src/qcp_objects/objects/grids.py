@@ -1,7 +1,7 @@
 # Interaction maps
 from . import *
 
-from qc_objects.util.util import load_json
+from qcp_objects.util.util import load_json
 
 class molecular_isodensity_grid_meta(BaseModel):
     num_vertices: int=-1

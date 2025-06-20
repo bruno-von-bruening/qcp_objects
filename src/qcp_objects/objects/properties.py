@@ -1,10 +1,10 @@
 from . import *
 from .grids import molecular_isodensity_grid
 import copy
-from qc_objects.file_readers.file_readers import fchk_reader , read_xyz_file
-from qc_global_utilities.encoding_and_conversion.constants import ANGSTROM_TO_BOHR, BOHR_TO_ANGSTROM
+from qcp_objects.file_readers.file_readers import fchk_reader , read_xyz_file
+from qcp_global_utils.encoding_and_conversion.constants import ANGSTROM_TO_BOHR, BOHR_TO_ANGSTROM
 from typing import Literal
-from qc_objects.file_readers.camcasp_reader import read_mom_file
+from qcp_objects.file_readers.camcasp_reader import read_mom_file
 
 class my_units(BaseModel):
     LENGTH: Literal['BOHR','ANGSTROM']='BOHR'

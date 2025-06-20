@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from qc_objects.operations.calculate_esp_dmp import calculate_esp_dmp
+from qcp_objects.operations.calculate_esp_dmp import calculate_esp_dmp
 
 def main(grid, dmp, ranks):
     calculate_esp_dmp(grid=grid, multipoles=dmp, ranks=ranks)

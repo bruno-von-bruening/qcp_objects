@@ -23,5 +23,5 @@ mynpar = Annotated[   np.ndarray,
                             BeforeValidator(nd_array_before_validator),
                             PlainSerializer(nd_array_serializer, return_type=List),
                         ]
-from qc_global_utilities.environment.file_handling import load_json_or_yaml
-from qc_global_utilities.encoding_and_conversion.encoding import nuclear_charge_to_element_symbol, element_symbol_to_nuclear_charge
+from qcp_global_utils.environment.file_handling import load_json_or_yaml
+from qcp_global_utils.encoding_and_conversion.encoding import nuclear_charge_to_element_symbol, element_symbol_to_nuclear_charge
