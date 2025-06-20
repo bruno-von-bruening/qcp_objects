@@ -339,3 +339,175 @@ class read_mom_file(file_reader):
         self.atom_coordinates=[ atom['xyz'] for atom in atoms ]
         self.site_ranks=[ atom['rank'] for atom in atoms ]
         self.site_dmp_di= [atom['mom_di'] for atom in atoms ]
+
+allowed_representation=Literal['S','C']
+
+
+
+
+class read_isapol_pair_file(BaseModel,file_reader):
+    _comtag=['!']
+    tensor_elements: List[List[float]]    # 2D <- sites x plain matrix
+    induced_ranks: List[List[int]]              #  
+    field_ranks: List[List[int]]
+    induced_representation: List[allowed_representation]|allowed_representation
+    field_representation: List[allowed_representation]|allowed_representation
+    site_indices: List[Tuple[int,int]]
+    freq2: List[float]
+    def __init__(self,*args,**kwargs):
+        assert len(args)==1, f"expected exactely on positional argument (a file)"
+        the_file=args[0]
+        assert os.path.isfile(the_file), f"Not a file:\n{the_file}"
+        assert the_file.lower().endswith('.pol'), f"expected .pol exentsion, got: {the_file}"
+
+        dic=self.read_file(the_file)
+        for k in dic.keys():
+            assert k not in kwargs.keys(), f"Double index (both from red file and provided one)"
+        super().__init__(**dic,**kwargs)
+        if len(set(self.induced_representation))==1: self.induced_representation=self.induced_representation[0]
+        if len(set(self.field_representation))==1: self.field_representation=self.field_representation[0]
+    def read_file(self,file_name):
+        def is_start(l): return l.startswith('POL')
+        def is_end(l): return l.startswith('END')
+        def start_and_end_indices(contents):
+            ''' get beginning and end of blocks '''
+            block_start =[ i for i,x in enumerate(contents) if is_start(x)]
+            block_ends  =[ i for i,x in enumerate(contents) if is_end(x)]
+            block_indices=[]
+            # Match ends to start
+            for start_index in block_start:
+                larger_ends=[x for x in block_ends if x>start_index]
+                assert len(larger_ends)>0, f"Did not find end statement after line (index: {start_index}): {contents[start_index]}"
+                end_index=min(larger_ends)
+                block_indices+=[(start_index, end_index)]
+            return block_indices
+        
+        def check_block_indices(block_indices):
+            num_blocks=len(block_indices)
+            
+            return block_indices
+
+        def parse_block(block: List[str]):
+            # First line is info, last line is end statement
+            assert is_start(block[0])
+            assert is_end(block[-1])
+            assert len(block)>2
+
+            def parse_info(line):
+                elements= list(enumerate(line.split())) 
+                
+                # UTIL
+                def get_index(elements, key):
+                    index_start=[ i for  i,x in elements if x==key]
+                    assert len(index_start)==1; index_start=index_start[0]
+                    return index_start
+                def check_index(elements, index, expected_key):
+                    assert elements[index][1]==expected_key, f"{index}, {expected_key}, {elements[index]}"
+
+                def get_at_inds(elements):
+                    def index_convention(num):
+                        """CamCASP has fortran indexing (starting from 1)"""
+                        return num-1
+                    index_start=get_index(elements, 'SITE-INDICES')
+                    at_index=elements[ index_start+1:index_start+3]
+                    at_index=[ index_convention(int(x[1])) for x in at_index ]
+                    return at_index
+                def get_ranks(elements):
+                    index_start=get_index(elements, 'RANK')
+                    check_pairs=[ 
+                        (index_start+2,':'),
+                        (index_start+4,'BY'),    
+                        (index_start+6,':'),
+                    ]
+                    index_indices=[ index_start+1,index_start+3, index_start+5, index_start+7]
+                    [ check_index(elements,ind, key) for ind,key in check_pairs ]
+                    index_matrix=[ elements[ind] for ind in index_indices]
+                    index_matrix=[ int(x[1]) for x in index_matrix]
+                    return index_matrix
+                def get_representation(elements):
+                    index_start=get_index(elements, 'CARTSPHER')
+                    return elements[index_start+1][1]
+                def get_freq(elements):
+                    index_start=get_index(elements, 'FREQ2')
+                    freq2=elements[index_start+1][1]
+                    try:
+                        return float(freq2)
+                    except Exception: raise Exception(f"Cannot interprete as float: {freq2}\n {elements}")
+
+
+
+
+                at_inds=get_at_inds(elements)
+                rank_matrix=get_ranks(elements)
+                representation=get_representation(elements)
+                freq=get_freq(elements)
+
+                return at_inds,rank_matrix, representation, freq
+            
+            def parse_data(lines):
+                data=' '.join(lines).split()
+                return np.array(data, dtype=float)
+            
+            
+            def reshape(plain_array, convention, rank_matrix):
+                rank_matrix=np.array(rank_matrix, dtype=int).reshape(-1,2)
+                rank_matrix[:,1]+=1
+                ranks_pol, ranks_org=[
+                    list(range(*[int(i) for i in rank_matrix[j]]))
+                    for j in [0,1]
+                ]
+
+                def elements_per_rank(representation, rank):
+                    if representation=='S':
+                        return 2*rank+1
+                    else: raise Exception(f"Unkown representation tag: \'{representation}\'")
+                def representation_vector_length(representation, ranks):
+                    return np.sum([ elements_per_rank(representation, n) for n in ranks ])
+                    
+
+                # Check if length matches
+                length_pol, length_org = [ representation_vector_length(representation, ranks) for ranks in [ranks_pol, ranks_org]]
+                expected_length= length_pol*length_org
+                assert expected_length==plain_array.size, f"{expected_length}, {plain_array.size}"
+
+                reshaped_array=plain_array.reshape(length_pol, length_org )
+                return ranks_pol, ranks_org, reshaped_array
+            at_inds ,rank_matrix, representation, freq2 = parse_info(block[0])
+            np_array=parse_data(block[1:-1])
+            ranks_pol, ranks_org, pol_matrix=reshape(np_array, representation, rank_matrix)
+
+            pol_tens=dict(
+                tensor_elements=pol_matrix.reshape(-1),
+                induced_ranks=ranks_pol,
+                field_ranks=ranks_org,
+                induced_representation=representation,
+                field_representation=representation,
+                site_indices=at_inds,
+                freq2=freq2,
+            )
+            return pol_tens
+
+
+
+        assert os.path.isfile(file_name)
+        with open(file_name,'r') as rd:
+            contents=rd.readlines()
+        
+        # Get the contents into blocks
+        block_indices=start_and_end_indices(contents)
+        assert len(block_indices)>0, f"No blocks found"
+        block_indices=check_block_indices(block_indices)
+    
+        # each text section is parsed to a sub unit of information
+        text_sections=[ contents[b[0] : b[1]+1] for b in block_indices ]
+        pol_tensors=[ parse_block(sec) for sec in text_sections ]
+        # Combine all the subunits by vectorising the columns
+        keys=pol_tensors[0].keys()
+        all_pol_tensors=dict( (k,[]) for k in keys )
+        for pol_tensor in pol_tensors:
+            for k in all_pol_tensors.keys():
+                all_pol_tensors[k]+=[ pol_tensor[k] ]
+        
+            #assert set(keys)==set(pol_tensor.keys()), f"Keys are not expected: {key}"
+
+        return all_pol_tensors
