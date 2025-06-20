@@ -1,4 +1,5 @@
 from . import *
+from qcp_global_utils.environment.file_handling import temporary_file
 
 class file_reader():
     lines=None
@@ -8,7 +9,6 @@ class file_reader():
     dic={}
     # Init function checks if file exists reads in the line from file
     def __init__(self, inp_fi):
-        from qc_utils.file_handling import temporary_file
 
         self.input_file=inp_fi
         if self.input_file.endswith('.xz'):
@@ -302,11 +302,16 @@ class json_reader():
             
 
 class fchk_data(BaseModel):
+    mode            : str|None=None # mode e.g. SP or FORCE
+    method          : str|None=None # electronic structure method used
+    basis           : str           # basis set used
     atomic_numbers  : List[int] = []
     number_of_atoms : int = Field(default=-1, ge=1)
     coordinates     : List[List[float]]= []
     charge          : int 
     multiplicity    : int
+    method          : str
+    basis           : str
 
 class fchk_reader(file_reader):
     comtag          : List[str]=[]
@@ -320,6 +325,14 @@ class fchk_reader(file_reader):
 
         # Numbered lines with truncated comments as process by partent
         lines_no=self.lines_nocom
+
+        # The first line is a comment the second is the header
+        def get_header(line):
+            ar=line.split()
+            assert len(ar)==3, f"Expected 3 entries on header line:\n   {line}"
+            return ar
+        header_line=lines_no[1] 
+        mode, method, basis = get_header(header_line)
 
         # Get all lines with text
         text_line_search=r'^[A-Z]'
@@ -346,6 +359,7 @@ class fchk_reader(file_reader):
         assert len(coordinates)>0
         assert len(atomic_numbers)>0
         return fchk_data(
+            mode=mode, method=method, basis=basis,
             charge=charge, multiplicity=multiplicity, number_of_atoms=number_of_atoms, coordinates=coordinates, atomic_numbers=atomic_numbers
         )
 
@@ -463,6 +477,14 @@ class read_xyz_file(geometry_reader):
         coordinates=np.array(coordinates)
         self.atom_types=atom_types
         self.coordinates=coordinates
+    @validate_call
+    def make_geometry(self):
+        return {
+            'coordinates':self.coordinates,
+            'atom_types': self.atom_types,#[ nuclear_charge_to_element_symbol(x) for x in dat.atomic_numbers ],
+            'multiplicity': None,# dat.multiplicity,
+            'charge': None,#dat.charge,
+        }
     def to_dict(self):
         keys=['coordinates','atom_types','num_sites','charge','multiplicity']
         return dict([ (k,getattr(self,k)) for k in keys])

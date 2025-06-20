@@ -1,17 +1,18 @@
 from . import *
 from .grids import molecular_isodensity_grid
 import copy
-from qc_objects.file_readers.file_readers import fchk_reader, read_xyz_file
-from qc_global_utilities.encoding_and_conversion.constants import ANGSTROM_TO_BOHR, BOHR_TO_ANGSTROM
+from qcp_objects.file_readers.file_readers import fchk_reader , read_xyz_file
+from qcp_global_utils.encoding_and_conversion.constants import ANGSTROM_TO_BOHR, BOHR_TO_ANGSTROM
 from typing import Literal
-from qc_objects.file_readers.camcasp_reader import read_mom_file
+from qcp_objects.file_readers.camcasp_reader import read_mom_file
 
 class my_units(BaseModel):
-    LENGTH: Literal['BOHR','ANGSTROM']
+    LENGTH: Literal['BOHR','ANGSTROM']='BOHR'
     #energy: Literal['HARTREE','kJ']
 class geometry(BaseModel):
     ifi: str|None=None
-    coordinates: List[List[float]]|None=None # allways save in Bohr
+    #coordinates: List[List[float]]|None=None # allways save in Bohr
+    _coordinates: List[List[float]]|None=None # allways save in Bohr
     units: my_units # Controls only input/output units
     _internal_units: my_units=my_units( LENGTH='BOHR' ) # Controls only input/output units
     atom_types: List[str]|None=None
@@ -24,35 +25,43 @@ class geometry(geometry):
     @property
     def coordinates(self):
         ''' Coorindates are allways saved in Bohr, but are returned in current unit '''
-        conversion=self.unit_handler('LENGTH')
+        conversion=self.internal_to_external_unit('LENGTH', self.units.LENGTH)
         return self._coordinates*conversion
-    @coordinates.setter
-    def coordinates(self,value):
-        """ Saves coordinates in Bohr """
-        coor=None
-        if type(value)==list:
-            coor=np.array(value)
-        elif isinstance(value, type(np.array([])) ):
-            coor=value
-        else:
-            raise Exception(f"Unkown format: {type(value)}")
+    #@coordinates.setter
+    #def coordinates(self,value):
+    #    """ Saves coordinates in Bohr """
+    #    raise Exception()
 
-        shape=coor.shape
-        if len(shape)!=2:
-            raise Exception()
-        elif shape[1]!=3:
-            raise Exception()
+    #    coor=None
+    #    if type(value)==list:
+    #        coor=np.array(value)
+    #    elif isinstance(value, type(np.array([])) ):
+    #        coor=value
+    #    else:
+    #        raise Exception(f"Unkown format: {type(value)}")
 
-        conversion=self.unit_handler('LENGTH')
-        self._coordinates=coor/conversion
-    def unit_handler(self, key):
+    #    shape=coor.shape
+    #    if len(shape)!=2:
+    #        raise Exception()
+    #    elif shape[1]!=3:
+    #        raise Exception()
+
+    #    conversion=self.unit_handler('LENGTH')
+    #    print(conversion)
+    #    self._coordinates=coor/conversion
+        
+    def internal_to_external_unit(self, key, input_unit=None):
         ''' Return conversion factor for given unit '''
-        if not key in self._internal_units.keys():
+        
+        internal_units=self._internal_units.model_dump()
+        external_units=self.units.model_dump()
+        if not key in internal_units.keys():
             raise Exception()
-        if not key in self.units.keys():
+        if not key in external_units.keys():
             raise Exception()
-        internal_unit, output_unit= self._internal_units[key], self.units[key]
-        self.units[key]=None # Set this explicitly before requesting output, to make things clear!
+        internal_unit, output_unit= internal_units[key], external_units[key]
+        
+        #setattr(self.units,key,None) # Set this explicitly before requesting output, to make things clear!
         
         def unit_val(unit_key):
             # Values in au
@@ -67,14 +76,23 @@ class geometry(geometry):
         internal_unit_val=unit_val(internal_unit)
         output_unit_val=unit_val(output_unit)
     
-        conversion_factor= output_unit_val/internal_unit_val
+        conversion_factor= internal_unit_val/output_unit_val
         return conversion_factor
-        
-    def __init__(self,inp=None,coordinates=None, atom_types=None, length_units=None):
+
+    @val_call 
+    def __init__(self,
+        inp:str|None=None,
+        coordinates:np.ndarray|None=None, 
+        atom_types:List[str|int]|None=None, 
+        length_units:str|None=None, 
+        charge:int=0, 
+        multiplicity:int=1
+    ):
         if type(inp)==str:
             if inp.endswith('.xyz'):
-                kwargs=read_xyz_file(inp).to_dict()
-                kwargs.update({'units':{'LENGTH':'ANGSTROM'}})
+                kwargs=read_xyz_file(inp).make_geometry()
+                kwargs.update({'units':{'LENGTH':'ANGSTROM'}, 'charge':charge,'multiplicity':multiplicity})
+                #self.units['LENGTH']='ANGSTROM'
             elif inp.endswith('.sdf'):
                 self.units['LENGTH']='ANGSTROM'
                 info_dict=read_sdf_file(inp)
@@ -87,13 +105,17 @@ class geometry(geometry):
             # self.atom_types=info_dict.atom_types
             # self.charge=info_dict.charge
             # self.multiplicty=info_dict.multiplicity
-            super().__init__(**kwargs)
+            # conversion=self.unit_handler(kwargs['units']['LENGTH'])
+            # print(conversion)
+            # kwargs['coordinates']*=1./conversion
+            # kwargs.coordinates=self.coordinates
         elif isinstance(inp, type(None)):
+            kwargs={}
             if type(coordinates) != type(None):
                 if type(length_units)==type(None):
                     raise Exception(f"Need to provide length unit when coordinates are read in over options")
-                self.units['LENGTH']=length_units
-                self.coordinates=coordinates
+                kwargs.update({'units':{'LENGTH':'BOHR'}})
+                kwargs.update({'coordinates':coordinates})
             else:
                 raise Exception(f"No input file provided, need coordinates then")
             if type(atom_types) != type(None) :
@@ -105,12 +127,13 @@ class geometry(geometry):
                         tmp_at_ty.append(atomic_charge_to_atom_type(x))
                     else:
                         raise Exception(f"Unkown type {x}")
-                self.atom_types=tmp_at_ty
-
+                kwargs.update({'atom_types':tmp_at_ty})
             else:
                 raise Exception(f"No input file provided, need atom types then")
         else:
             raise Exception(inp)
+        super().__init__(**kwargs)
+        self._coordinates=np.array(kwargs['coordinates'])/self.internal_to_external_unit('LENGTH',self.units.LENGTH)
     def connec(self):
         #from rdkit.Chem import AllChem,rdDetermineBonds
         if type(self.ifi) != type(None):
@@ -143,19 +166,31 @@ class geometry(geometry):
             camcasp_atom_tags.append(f"{at_ty}_{at_count[at_ty]:02d}")
         return camcasp_atom_tags
     @property
-    def camcasp_coordinates_string(self):
-        lines=[]
-        self.units.LENGTH='BOHR'
-        lines+=[ "units {}".format(self.units.LENGTH) ]
-
+    def camcasp_sites(self):
         coords=self.coordinates
         camcasp_atom_tags=self.camcasp_atom_tags
         atom_types=self.atom_types
         nuclear_charges=self.nuclear_charges
-        for coor, tag, at_ty, Z in zip( coords, camcasp_atom_tags, atom_types, nuclear_charges):
+        return [
+            dict(coordinate=c, tag=tag, atom_type=atty, charge=charge)                for
+            c,tag,atty, charge  in zip( coords, camcasp_atom_tags, atom_types, nuclear_charges)
+        ]
+    @property
+    def camcasp_sites_string(self):
+        lines=[]
+        for site in self.camcasp_sites:
+            coor, tag, at_ty, Z = list(site.values())
             line=' '.join(['{:<6} {:>5}']+3*["{:>12}"]+['Type {:<2}'])
             line=line.format(tag,f"{Z:.1f}", *[f"{x:.8f}" for x in coor], at_ty)
             lines.append(line)
+        return lines
+    @property
+    def camcasp_coordinates_string(self):
+        lines=[]
+        self.units.LENGTH='BOHR'
+        lines+=[ "units {}".format(self.units.LENGTH) ]
+        lines+=self.camcasp_sites_string
+
         return '\n'.join(lines)
     @property
     def nuclear_charges(self):

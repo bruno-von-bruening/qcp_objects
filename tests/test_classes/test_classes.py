@@ -14,7 +14,7 @@ def get_dummy_file(file_name, source=qcprop_test_data):
     return dummy_file
 
 def create_multipoles():
-    from qc_objects.objects.property import multipoles
+    from qc_objects.objects.properties import multipoles
     dummy_file=get_dummy_file('H2.mom')
     mom=multipoles(dummy_file)
 

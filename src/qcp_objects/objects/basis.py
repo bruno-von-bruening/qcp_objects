@@ -2,7 +2,7 @@
 from . import *
 import json
 import numpy as np
-from qc_objects.file_readers.camcasp_reader import read_camcasp_solution, read_camcasp_basis
+from qcp_objects.file_readers.camcasp_reader import read_camcasp_solution, read_camcasp_basis
 
 
 class radial_atomic_basis(BaseModel):
@@ -19,17 +19,6 @@ class radial_atomic_basis(BaseModel):
     def check(self): # should check if all arrays have the same length
         raise Exception(f"Not implemented yet")
     
-    @property
-    def length_of_contracted(self):
-        length_keys=['exponent_scales','exponent_orders','normalizations']
-        if self.coefficients  is not None:
-            length_keys+=['coefficients']
-        if self.initial_coefficients is not None:
-            length_keys+=['initial_coefficients']
-        
-        lengths=[ len(getattr(self,k)) for k in length_keys]
-        assert len(set(lengths))==1, f"Multiple different lengths {lengths} {length_keys}"
-        return lengths[0]
 
 class radial_atomic_basis(radial_atomic_basis):
     """ Basis set for an individual site
@@ -75,6 +64,17 @@ class radial_atomic_basis(radial_atomic_basis):
         super().__init__(**dic)
         #self.length_of_contracted=len(self.exponent_orders)
     
+    @property
+    def length_of_contracted(self):
+        length_keys=['exponent_scales','exponent_orders','normalizations']
+        if self.coefficients  is not None:
+            length_keys+=['coefficients']
+        if self.initial_coefficients is not None:
+            length_keys+=['initial_coefficients']
+        
+        lengths=[ len(getattr(self,k)) for k in length_keys]
+        assert len(set(lengths))==1, f"Multiple different lengths {lengths} {length_keys}"
+        return lengths[0]
     def generate_horton_basis(self):
         """ Generate dictionary needed for horton basis set definition """
         # Do not need normalization (implicit in horton) and no coefficients (since basis set)

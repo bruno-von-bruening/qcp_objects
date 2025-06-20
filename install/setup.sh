@@ -1,6 +1,6 @@
 
-conda_env='qcPROP'
-conda_file='install/qcPROP_env.yaml'
+conda_env='qcp_objects'
+conda_file="install/${conda_env}_env.yaml"
 
 if [ ! -f ${conda_file} ]; then
    echo "The file \'${conda_file}\' does not exist"

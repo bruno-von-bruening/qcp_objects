@@ -1,5 +1,5 @@
 [project]
-name = "property_objects"
+name = "qcp_objects"
 version = "0.1.01"
 description = ''
 readme = "README.md"
