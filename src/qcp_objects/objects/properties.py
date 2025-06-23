@@ -3,11 +3,15 @@ from .grids import molecular_isodensity_grid
 import copy
 from qcp_objects.file_readers.file_readers import fchk_reader , read_xyz_file
 from qcp_global_utils.encoding_and_conversion.constants import ANGSTROM_TO_BOHR, BOHR_TO_ANGSTROM
+from qcp_global_utils.encoding_and_conversion.encoding import element_symbol_to_nuclear_charge, nuclear_charge_to_element_symbol
 from typing import Literal
 from qcp_objects.file_readers.camcasp_reader import read_mom_file
 
+from qcp_objects.file_readers.file_writers import xyz_writer
+
+allowed_length_units=['BOHR','ANGSTROM']
 class my_units(BaseModel):
-    LENGTH: Literal['BOHR','ANGSTROM']='BOHR'
+    LENGTH: Literal[tuple(allowed_length_units)]='BOHR'
     #energy: Literal['HARTREE','kJ']
 class geometry(BaseModel):
     ifi: str|None=None
@@ -82,17 +86,22 @@ class geometry(geometry):
     @val_call 
     def __init__(self,
         inp:str|None=None,
-        coordinates:np.ndarray|None=None, 
-        atom_types:List[str|int]|None=None, 
+        coordinates:np.ndarray|None|np.ndarray=None, 
+        atom_types:List[str|int]|None|np.ndarray=None, 
         length_units:str|None=None, 
         charge:int=0, 
-        multiplicity:int=1
+        multiplicity:int=1,
+        #units: my_units,
     ):
         if type(inp)==str:
             if inp.endswith('.xyz'):
                 kwargs=read_xyz_file(inp).make_geometry()
                 kwargs.update({'units':{'LENGTH':'ANGSTROM'}, 'charge':charge,'multiplicity':multiplicity})
                 #self.units['LENGTH']='ANGSTROM'
+            elif inp.endswith('.mom'):
+                kwargs=multipoles(inp).return_geom().to_dict()
+                kwargs.update({'units':{'LENGTH':kwargs['length_units']}})
+                del kwargs['length_units']
             elif inp.endswith('.sdf'):
                 self.units['LENGTH']='ANGSTROM'
                 info_dict=read_sdf_file(inp)
@@ -114,7 +123,8 @@ class geometry(geometry):
             if type(coordinates) != type(None):
                 if type(length_units)==type(None):
                     raise Exception(f"Need to provide length unit when coordinates are read in over options")
-                kwargs.update({'units':{'LENGTH':'BOHR'}})
+                assert length_units in allowed_length_units
+                kwargs.update({'units':{'LENGTH':length_units}})
                 kwargs.update({'coordinates':coordinates})
             else:
                 raise Exception(f"No input file provided, need coordinates then")
@@ -124,7 +134,7 @@ class geometry(geometry):
                     if isinstance(x, str):
                         tmp_at_ty.append(x)
                     elif isinstance(x, int):
-                        tmp_at_ty.append(atomic_charge_to_atom_type(x))
+                        tmp_at_ty.append(nuclear_charge_to_element_symbol(x))
                     else:
                         raise Exception(f"Unkown type {x}")
                 kwargs.update({'atom_types':tmp_at_ty})
@@ -197,9 +207,12 @@ class geometry(geometry):
         return [ element_symbol_to_nuclear_charge(x) for x in self.atom_types]
     def print_out(self, output_name=None, format='xyz'):
         if format=='xyz':
-            self.units['LENGTH']='ANGSTROM'
+            self.units.LENGTH='ANGSTROM'
             writer=xyz_writer(output_name, write=True, coordinates=self.coordinates, 
                     atom_types=self.atom_types, comment='Generated automatically')
+        return output_name
+    def to_xyz_file(self, output_name=None):
+        return self.print_out(output_name=output_name, format='xyz')
     @validate_call
     def com(self, weighted:bool=False) -> Tuple[float, float, float]:
         coords=np.array(self.coordinates)
@@ -213,6 +226,7 @@ class geometry(geometry):
             'atom_types': self.atom_types,
             'charge': self.charge,
             'multiplicity': self.multiplicity,
+            'length_units': self.units.LENGTH,
         }
         return dic
 
@@ -412,6 +426,7 @@ class multipoles_data(BaseModel):
     output_file: str = None
     input_file: str
     _au_to_kj_mol=2625.49963947
+    length_units: Literal[tuple(allowed_length_units)]='BOHR'
     class Config:
         arbitrary_types_allowed=True
     @property
@@ -470,12 +485,13 @@ class multipoles(multipoles_data):
                 atom_coordinates=multipoles_raw.atom_coordinates
                 site_dmp_di=multipoles_raw.site_dmp_di
                 tag_to_rank=multipoles_raw.tag_to_rank
+                length_units='BOHR'
             else:
                 raise Exception(f"Error in creating multipoles")
-        super().__init__(input_file=input_file, atom_types=atom_types, atom_coordinates=atom_coordinates, site_dmp_di=site_dmp_di, tag_to_rank=tag_to_rank)
+        super().__init__(input_file=input_file, atom_types=atom_types, atom_coordinates=atom_coordinates, site_dmp_di=site_dmp_di, tag_to_rank=tag_to_rank,
+                         length_units=length_units)
     def return_geom(self, connectivity=False):
-        geom=geometry(atom_types=self.atom_types, coordinates=self.atom_coordinates)
-        geom.connec()
+        geom=geometry(atom_types=self.atom_types, coordinates=self.atom_coordinates, length_units=self.length_units)
         if connectivity:
             geom.connec()
         return geom
