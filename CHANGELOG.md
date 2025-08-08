@@ -5,5 +5,7 @@ Changing imports
 Added reading of isapol file
 ## [0.1.03]
 Changed printout of xyz file and allowed mom file to be processed as geometry
-
-
+## v0.01.04 new mom file write and some minor fixes
+some changes in radial_atomic_basis (bit weirdly written)
+some typo fixes in the ```isa.py``` file 
+new ```custom_mtp_mom_file``` routine.

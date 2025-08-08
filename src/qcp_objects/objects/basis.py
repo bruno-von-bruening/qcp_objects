@@ -4,6 +4,7 @@ import json
 import numpy as np
 from qcp_objects.file_readers.camcasp_reader import read_camcasp_solution, read_camcasp_basis
 
+from typing import Any
 
 class radial_atomic_basis(BaseModel):
     exponent_scales         : List[List[float]]
@@ -14,6 +15,9 @@ class radial_atomic_basis(BaseModel):
     center                  : List[Tuple[float,float,float]]|None=None
     coefficients            : List[float]|None=None
     initial_coefficients    : List[float]|None=None
+    #@model_serializer
+    #def ser_model(self) -> dict[str, Any]:
+    #    return self.model_dump()
 
     #angular_functions       : None=None
     def check(self): # should check if all arrays have the same length
@@ -163,8 +167,8 @@ class radial_atomic_basis(radial_atomic_basis):
 #class radial_basis(base_basis):
 #    def __init__(self, inp, inp_type=None):
 #        super().__init__(inp, inp_type=inp_type)
-#    def to_dict(self,keys=None, format=None):
-#        return self.model_dump()
+    def to_dict(self,keys=None, format=None):
+        return self.model_dump()
         # at={
         #     'exponent_scales': self.exponent_scales,
         #     'exponent_orders': self.exponent_orders,
@@ -328,7 +332,8 @@ class molecular_radial_basis(molecular_basis):
         for i,b in enumerate(self.basis_expansions):
             at_dic=b.to_dict()
             atoms.append(at_dic)
-        dic={'shape_functions':atoms, 'coordinates':self.coordinates, 'atom_types':self.atom_types}
+        dic=self.model_dump(include={'shape_functions':atoms, 'coordinates':self.coordinates,
+                                     'atom_types':self.atom_types})
         cleaned_dic={}
         for key in dic.keys():
             if isinstance(dic[key], type(np.array([])) ):

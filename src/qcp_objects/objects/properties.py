@@ -417,6 +417,51 @@ class rotate_multipoles():
             monos, dipos, quads, octos, hexas
         ]
 
+def custom_mtp_mom_file(filename,z_nums,mul_ar,coords=None, type='unspecified'):
+    """ I just pulled that from """
+    def separate_multipoles(MTPs):
+        ret_di={}
+        order_di={
+            0:"mono", 1:"di", 2:"quadro", 3:"octo", 4:"hexadeca"
+        }
+        lower=0 ; upper=0
+        for i in range(0,100):
+            upper+=(2*i+1)
+            assert upper<=len(MTPs), f"Problem with MTP asignment: {upper} is larger than {len(MTPs)}"
+            ret_di.update({order_di[i]:np.array(MTPs[lower:upper])})
+            if upper==len(MTPs):
+                return ret_di
+            lower=upper
+        raise Exception("Problem with MTP assignment: no end")
+
+    if not len(set(map(len,[coords,z_nums,mul_ar])))==1:
+        quit(f"Lengths between objects not uniform:\n"
+                f"coords, z_nums, mul_ar are: {[len(x) for x in [coords,z_nums,mul_ar] ]}")
+    wr=open(filename,'w')
+    wr.write(f"! Multipole moments for {filename}\n"+
+            f"! Based on DF-type: {type}\n\n")
+    cnt_di={}
+    for i in range(len(z_nums)):
+        MTP_di=separate_multipoles(mul_ar[i])
+        from qcp_global_utils.encoding_and_conversion.encoding import nuclear_charge_to_element_symbol
+        at_ty=nuclear_charge_to_element_symbol(z_nums[i])
+        if not at_ty in cnt_di.keys():
+            cnt_di.update({at_ty:1})
+        else:
+            cnt_di[at_ty]+=1
+        wr.write(f"{at_ty}{cnt_di[at_ty]:03d}")
+        if len(coords)>0:
+            coor=[f"{x:.8f}" for x in coords[i]]
+            wr.write(f" {coor[0]:>14} {coor[1]:>14} {coor[2]:>14}")
+        rank=len(list(MTP_di.keys()))-1
+        wr.write(f"   Type {at_ty}  Rank {rank}\n")
+        for order in MTP_di.keys():
+            #wr.write(f"ord-{order:<8}")
+            for pol in MTP_di[order]:
+                h_str=f"{pol:.6f}"
+                wr.write(f" {h_str:>10}")
+            wr.write("\n")
+        wr.write("\n")
 
 class multipoles_data(BaseModel):
     atom_types: List[str|int]

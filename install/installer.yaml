@@ -1,0 +1,3 @@
+conda_env_file: qcp_objects_env.yaml
+dependencies:
+  - QCP_GLOBAL_UTILS_HOME

@@ -1,5 +1,7 @@
 **__pycache__/
 **.egg-info/
+back/
 build/
+build.back/
 dist/
 add_to_shell_init.txt
