@@ -53,17 +53,22 @@ class file_reader():
     @property
     def lines_num_nocom(self):
         return [ (i,l) for i,l in enumerate(self.lines_nocom) ]
-    def get_line_no(self, match=None, fullmatch=False, single=False, in_range=None):
+    def get_line_no(self, match=None, fullmatch=False, single=False, in_range=None, case_sensitive=True):
         # Check that type is a string
         if type(match)!=None:
             if type(match)!=str:
                 raise Exception()
         else:
             raise Exception()
-        if not fullmatch:
-            results=[ v[0] for v in self.lines_num_nocom if re.search( match, v[1] ) ]
+        if case_sensitive:
+            args=[]
         else:
-            results=[ v[0] for v in self.lines_num_nocom if re.fullmatch( match, v[1] ) ]
+            args=[re.IGNORECASE]
+        
+        if not fullmatch:
+            results=[ v[0] for v in self.lines_num_nocom if re.search( match, v[1], *args ) ]
+        else:
+            results=[ v[0] for v in self.lines_num_nocom if re.fullmatch( match, v[1], *args ) ]
         # Get range
         if type(in_range)==type(None):
             pass

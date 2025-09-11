@@ -1,6 +1,66 @@
 from . import *
 from .file_readers import file_reader
 
+class camcasp_file_reader(file_reader):
+    comtag='!'
+    def get_block(self,tag, block_range=None, occurence=None, begin_str=None, end_str=None):
+        begin_str=rf"^[ ]*BEGIN {tag}" if begin_str is None else rf"^[ ]*{begin_str}"
+        end_str=f"^[ ]*END {tag}" if end_str is None else rf"^[ ]*{end_str}"
+        begin=self.get_line_no(begin_str, fullmatch=False, case_sensitive=False)
+        stop=self.get_line_no(end_str, fullmatch=False, case_sensitive=False)
+        if type(block_range)!=type(None):
+            begin=[ x for x in begin if x>block_range[0] and x<block_range[1]]
+            stop=[ x for x in stop if x>block_range[0] and x<block_range[1]]
+        # Check integrity and create  start to stop pairs
+        if len(begin)!=len(stop):
+            raise Exception(f"Atom Begin and End statement unequal Frequency")
+        whole_list, start_stop_pairs=[[] , [] ]
+
+        for sta,end in zip(begin, stop):
+            whole_list+=[sta,end]
+            start_stop_pairs+= [ (sta,end) ]
+        # Check if odering is good
+        if any([ whole_list[i+1]-whole_list[i]<0 for i in range(len(whole_list)-1)  ]):
+            raise Exception(f"The pairs are not well ordered {whole_list}")
+        
+        if type(occurence)==int:
+            if not len(start_stop_pairs)==occurence:
+                raise Exception(f"Did not find a block for begin={begin_str}, end={end_str}")
+        elif type(occurence)==type(None):
+            pass
+        else:
+            raise Exception()
+        
+        return start_stop_pairs
+
+class read_camcasp_sites(camcasp_file_reader):
+    def __init__(self, inp_fi):
+        super().__init__(inp_fi)
+        self.dic=self.read_camcasp_sites()
+    def read_camcasp_sites(self):
+        def read_sites_block(entries):
+            dic={
+                'site_types':[],
+                'coordinates':[],
+                'site_tags':[]
+            }
+            for e in entries:
+                ar=e.split()
+                assert len(ar)==6
+                tag, x,y,z,type_tag, atom_type=ar
+                assert type_tag.upper()=='TYPE'
+                dic['site_types']+=[atom_type]
+                dic['site_tags']+=[tag]
+                dic['coordinates']+=[ (x,y,z) ]
+            return dic
+
+        start,stop=self.get_block('SITES', begin_str='Sites', end_str='End', occurence=1)[0]
+
+        entries=self.lines_nocom[start+1:stop]
+        return read_sites_block(entries)
+
+
+
 class read_camcasp_solution(file_reader):
     comtag='!'
     def __init__(self, inp_fi):
@@ -9,33 +69,6 @@ class read_camcasp_solution(file_reader):
     def read_camcasp_solution_file(self):
         ''' Read CAMCASP ISA solution FILE'''
         
-        def get_block(tag, block_range=None, occurence=None):
-            begin_str=rf"^[ ]*BEGIN {tag}"
-            end_str=f"^[ ]*END {tag}"
-            begin=self.get_line_no(begin_str, fullmatch=False)
-            stop=self.get_line_no(end_str, fullmatch=False)
-            if type(block_range)!=type(None):
-                begin=[ x for x in begin if x>block_range[0] and x<block_range[1]]
-                stop=[ x for x in stop if x>block_range[0] and x<block_range[1]]
-            # Check integrity and create  start to stop pairs
-            if len(begin)!=len(stop):
-                raise Exception(f"Atom Begin and End statement unequal Frequency")
-            whole_list, start_stop_pairs=[[] , [] ]
-            for sta,end in zip(begin, stop):
-                whole_list+=[sta,end]
-                start_stop_pairs+= [ (sta,end) ]
-            # Check if odering is good
-            if any([ whole_list[i+1]-whole_list[i]<0 for i in range(len(whole_list)-1)  ]):
-                raise Exception(f"The pairs are not well ordered {whole_list}")
-            
-            if type(occurence)==int:
-                if not len(start_stop_pairs)==occurence:
-                    raise Exception()
-            elif type(occurence)==type(None):
-                pass
-            else:
-                raise Exception()
-            return start_stop_pairs
 
         def read_basis_functions(start, end):
             def get_lines(star,end):
@@ -120,14 +153,14 @@ class read_camcasp_solution(file_reader):
             return {'coefficients':coefficients}
 
         # Get atom blocks and extract values
-        atom_start_stop_pairs=get_block('ATOM')
+        atom_start_stop_pairs=self.get_block('ATOM')
         atoms=[]
         coordinates=[]
         atom_types=[]
         for start, stop in atom_start_stop_pairs:
             # Get Atom type -> search for TYPE, but this key also exist in ISA-SHAPEFUNCTION Block, hence dropt soltion that occur the
             tag='ISA-SHAPE-FUNCTION'
-            shape_block=get_block(tag, block_range=[start,stop], occurence=1)[0]
+            shape_block=self.get_block(tag, block_range=[start,stop], occurence=1)[0]
             type_lino=self.get_line_no(r'^[ ]*TYPE', fullmatch=False, in_range=[start,stop])
             type_lino=[x for x in type_lino if x<shape_block[0] or x>shape_block[1] ]
             assert len(type_lino)==1, f"Did nof found one results for TYPE\n{type_lino}"
@@ -143,7 +176,7 @@ class read_camcasp_solution(file_reader):
 
             # Get Coordinates
             tag='SITES'
-            shape_block=get_block(tag, block_range=[start,stop], occurence=1)[0]
+            shape_block=self.get_block(tag, block_range=[start,stop], occurence=1)[0]
             assert shape_block[1]-shape_block[0]-1==1, f"Block {tag} should only feature one line, but does not"
             lines=self.lines_nocom[shape_block[0]+1:shape_block[1]]
             ar=lines[0].split()
@@ -156,10 +189,10 @@ class read_camcasp_solution(file_reader):
             coordinates.append([x,y,z])
 
             tag='BASIS-FUNCTIONS'
-            shape_block=get_block(tag, block_range=[start,stop], occurence=1)[0]
+            shape_block=self.get_block(tag, block_range=[start,stop], occurence=1)[0]
             dic=read_basis_functions(*shape_block)
             tag='COEFFICIENTS'
-            shape_block=get_block(tag, block_range=[start,stop], occurence=1)[0]
+            shape_block=self.get_block(tag, block_range=[start,stop], occurence=1)[0]
             dic_coeff=read_coefficients(*shape_block)
             dic.update(dic_coeff)
             atoms.append(dic)
