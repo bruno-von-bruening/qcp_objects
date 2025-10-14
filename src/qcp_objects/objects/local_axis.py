@@ -99,7 +99,7 @@ class local_axis_frame_constructor(BaseModel):
             return [z,x]
         def orient_bisector(i1,i2,i3):
             log.warning("Orienting with bisector should be negative (-Z)")
-            z='-'+bisector('z',i1,i2,i3)
+            z=bisector('z',i1,i2,i3)
             x=direct('x',i1,i3)
             return [z,x]
         def orient_z_the_x(i1,i2,i3):
@@ -111,9 +111,9 @@ class local_axis_frame_constructor(BaseModel):
             x=bisector('x',a,c,d)
             return [z,x]
         def orient_trisector(a,b,c,d):
-            log.warning("Orienting with trisector is not exact)")
+            log.warning("Orienting with trisector is not following a precise definition in orient")
             x=direct('x',b,c)
-            b=direct('y',c,d)
+            y=direct('y',c,d)
             z=direct('z',a,b)
             return [x,y,z]
 
