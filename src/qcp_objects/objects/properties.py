@@ -1,234 +1,36 @@
 from . import *
 from .grids import molecular_isodensity_grid
 import copy
-from qcp_objects.file_readers.file_readers import fchk_reader , read_xyz_file
-from qcp_global_utils.encoding_and_conversion.constants import ANGSTROM_TO_BOHR, BOHR_TO_ANGSTROM
-from qcp_global_utils.encoding_and_conversion.encoding import element_symbol_to_nuclear_charge, nuclear_charge_to_element_symbol
 from typing import Literal
 from qcp_objects.file_readers.camcasp_reader import read_mom_file
 
-from qcp_objects.file_readers.file_writers import xyz_writer
 
-allowed_length_units=['BOHR','ANGSTROM']
-class my_units(BaseModel):
-    LENGTH: Literal[tuple(allowed_length_units)]='BOHR'
-    #energy: Literal['HARTREE','kJ']
-class geometry(BaseModel):
-    ifi: str|None=None
-    #coordinates: List[List[float]]|None=None # allways save in Bohr
-    _coordinates: List[List[float]]|None=None # allways save in Bohr
-    units: my_units # Controls only input/output units
-    _internal_units: my_units=my_units( LENGTH='BOHR' ) # Controls only input/output units
-    atom_types: List[str]|None=None
-    multiplicity:int|None=Field(default=None, ge=1 )
-    multiplicity_ion: int|None=Field(default=None, ge=1)
-    charge:int|None=Field(default=None)
-    adjacency_matrix:List[List[int]]|None=None
+from .geometry import geometry_hidden
+from .local_axis import local_axis_frame_constructor
 
-class geometry(geometry):
-    @property
-    def coordinates(self):
-        ''' Coorindates are allways saved in Bohr, but are returned in current unit '''
-        conversion=self.internal_to_external_unit('LENGTH', self.units.LENGTH)
-        return self._coordinates*conversion
-    #@coordinates.setter
-    #def coordinates(self,value):
-    #    """ Saves coordinates in Bohr """
-    #    raise Exception()
-
-    #    coor=None
-    #    if type(value)==list:
-    #        coor=np.array(value)
-    #    elif isinstance(value, type(np.array([])) ):
-    #        coor=value
-    #    else:
-    #        raise Exception(f"Unkown format: {type(value)}")
-
-    #    shape=coor.shape
-    #    if len(shape)!=2:
-    #        raise Exception()
-    #    elif shape[1]!=3:
-    #        raise Exception()
-
-    #    conversion=self.unit_handler('LENGTH')
-    #    print(conversion)
-    #    self._coordinates=coor/conversion
-        
-    def internal_to_external_unit(self, key, input_unit=None):
-        ''' Return conversion factor for given unit '''
-        
-        internal_units=self._internal_units.model_dump()
-        external_units=self.units.model_dump()
-        if not key in internal_units.keys():
-            raise Exception()
-        if not key in external_units.keys():
-            raise Exception()
-        internal_unit, output_unit= internal_units[key], external_units[key]
-        
-        #setattr(self.units,key,None) # Set this explicitly before requesting output, to make things clear!
-        
-        def unit_val(unit_key):
-            # Values in au
-            if unit_key.upper() in ["BOHR"]:
-                ret_unit=1.
-            elif unit_key.upper() in ['ANGSTROM','ANG']:
-                ret_unit=ANGSTROM_TO_BOHR
-            else:
-                raise Exception(f"Unkown unit key: {unit_key}")
-            return ret_unit
-
-        internal_unit_val=unit_val(internal_unit)
-        output_unit_val=unit_val(output_unit)
-    
-        conversion_factor= internal_unit_val/output_unit_val
-        return conversion_factor
-
-    @val_call 
-    def __init__(self,
-        inp:str|None=None,
-        coordinates:np.ndarray|None|np.ndarray=None, 
-        atom_types:List[str|int]|None|np.ndarray=None, 
-        length_units:str|None=None, 
-        charge:int=0, 
-        multiplicity:int=1,
-        #units: my_units,
-    ):
-        if type(inp)==str:
-            if inp.endswith('.xyz'):
-                kwargs=read_xyz_file(inp).make_geometry()
-                kwargs.update({'units':{'LENGTH':'ANGSTROM'}, 'charge':charge,'multiplicity':multiplicity})
-                #self.units['LENGTH']='ANGSTROM'
-            elif inp.endswith('.mom'):
-                kwargs=multipoles(inp).return_geom().to_dict()
-                kwargs.update({'units':{'LENGTH':kwargs['length_units']}})
-                del kwargs['length_units']
-            elif inp.endswith('.sdf'):
-                self.units['LENGTH']='ANGSTROM'
-                info_dict=read_sdf_file(inp)
-            elif inp.endswith('.fchk'):
-                kwargs=fchk_reader(inp).make_geometry()
-                kwargs.update({'units':{'LENGTH':'BOHR'}})
-            else:
-                raise Exception(f"File format not handeled yet: {inp}")
-            # self.coordinates=info_dict.coordinates
-            # self.atom_types=info_dict.atom_types
-            # self.charge=info_dict.charge
-            # self.multiplicty=info_dict.multiplicity
-            # conversion=self.unit_handler(kwargs['units']['LENGTH'])
-            # print(conversion)
-            # kwargs['coordinates']*=1./conversion
-            # kwargs.coordinates=self.coordinates
-        elif isinstance(inp, type(None)):
-            kwargs={}
-            if type(coordinates) != type(None):
-                if type(length_units)==type(None):
-                    raise Exception(f"Need to provide length unit when coordinates are read in over options")
-                assert length_units in allowed_length_units
-                kwargs.update({'units':{'LENGTH':length_units}})
-                kwargs.update({'coordinates':coordinates})
-            else:
-                raise Exception(f"No input file provided, need coordinates then")
-            if type(atom_types) != type(None) :
-                tmp_at_ty=[]
-                for x in atom_types:
-                    if isinstance(x, str):
-                        tmp_at_ty.append(x)
-                    elif isinstance(x, int):
-                        tmp_at_ty.append(nuclear_charge_to_element_symbol(x))
-                    else:
-                        raise Exception(f"Unkown type {x}")
-                kwargs.update({'atom_types':tmp_at_ty})
-            else:
-                raise Exception(f"No input file provided, need atom types then")
+# Include dependencies to other object e.g. multipoles
+class geometry(geometry_hidden):
+    @val_call
+    def read_from_file(self,inp:file):
+        if inp.endswith('.xyz'):
+            kwargs=read_xyz_file(inp).make_geometry()
+            kwargs.update({'units':{'LENGTH':'ANGSTROM'}})
+            #self.units['LENGTH']='ANGSTROM'
+        elif inp.endswith('.mom'):
+            kwargs=multipoles(inp).return_geom().to_dict()
+            kwargs.update({'units':{'LENGTH':kwargs['length_units']}})
+            del kwargs['length_units']
+        elif inp.endswith('.sdf'):
+            self.units['LENGTH']='ANGSTROM'
+            info_dict=read_sdf_file(inp)
+        elif inp.endswith('.fchk'):
+            kwargs=fchk_reader(inp).make_geometry()
+            kwargs.update({'units':{'LENGTH':'BOHR'}})
         else:
-            raise Exception(inp)
-        super().__init__(**kwargs)
-        self._coordinates=np.array(kwargs['coordinates'])/self.internal_to_external_unit('LENGTH',self.units.LENGTH)
-    def connec(self):
-        #from rdkit.Chem import AllChem,rdDetermineBonds
-        if type(self.ifi) != type(None):
-            raw_mol = rdchem.rdmolfiles.MolFromXYZFile(self.ifi)
-            rdmol = rdchem.Mol(raw_mol)
-        else:
-            mol_block=f"{len(self.coordinates)}\n\n"
-            for ty,coor in zip( self.atom_types, self.coordinates):
-                bohr_to_angstrom=0.529177249
-                coor=[f"{float(x)*bohr_to_angstrom}" for x in coor]
-                mol_block+=f"{ty} {' '.join(coor)}\n"
-            rdmol=rdchem.MolFromXYZBlock(mol_block)
-            #mol_block = rdchem.MolToMolBlock(rdmol)
-        rdDetermineBonds.DetermineBonds(rdmol, charge=0)
-        self.adjacency_matrix=np.array(rdmolops.GetAdjacencyMatrix(rdmol, useBO=True))
-        #m_io.out().warn(f"Implement check for adjacency matrix, ie total valence electrons, number of bonds per species")
-        #self.adj_mat=rdchem.rdmolops.GetAdjacencyMatrix(rdmol, useBO=True)
-    #@classmethod
-    @property
-    def camcasp_atom_tags(self):
-        camcasp_atom_tags=[]
-        at_count={}
-        if type(self.atom_types)==type(None):
-            raise Exception(f"Atom types are not defined")
-        for at_ty in self.atom_types:
-            if not at_ty in at_count.keys():
-                at_count.update({at_ty:1})
-            else:
-                at_count[at_ty]+=1
-            camcasp_atom_tags.append(f"{at_ty}_{at_count[at_ty]:02d}")
-        return camcasp_atom_tags
-    @property
-    def camcasp_sites(self):
-        coords=self.coordinates
-        camcasp_atom_tags=self.camcasp_atom_tags
-        atom_types=self.atom_types
-        nuclear_charges=self.nuclear_charges
-        return [
-            dict(coordinate=c, tag=tag, atom_type=atty, charge=charge)                for
-            c,tag,atty, charge  in zip( coords, camcasp_atom_tags, atom_types, nuclear_charges)
-        ]
-    @property
-    def camcasp_sites_string(self):
-        lines=[]
-        for site in self.camcasp_sites:
-            coor, tag, at_ty, Z = list(site.values())
-            line=' '.join(['{:<6} {:>5}']+3*["{:>12}"]+['Type {:<2}'])
-            line=line.format(tag,f"{Z:.1f}", *[f"{x:.8f}" for x in coor], at_ty)
-            lines.append(line)
-        return lines
-    @property
-    def camcasp_coordinates_string(self):
-        lines=[]
-        self.units.LENGTH='BOHR'
-        lines+=[ "units {}".format(self.units.LENGTH) ]
-        lines+=self.camcasp_sites_string
+            raise Exception(f"File format not handeled yet: {inp}")
+        return kwargs
 
-        return '\n'.join(lines)
-    @property
-    def nuclear_charges(self):
-        return [ element_symbol_to_nuclear_charge(x) for x in self.atom_types]
-    def print_out(self, output_name=None, format='xyz'):
-        if format=='xyz':
-            self.units.LENGTH='ANGSTROM'
-            writer=xyz_writer(output_name, write=True, coordinates=self.coordinates, 
-                    atom_types=self.atom_types, comment='Generated automatically')
-        return output_name
-    def to_xyz_file(self, output_name=None):
-        return self.print_out(output_name=output_name, format='xyz')
-    @validate_call
-    def com(self, weighted:bool=False) -> Tuple[float, float, float]:
-        coords=np.array(self.coordinates)
-        charges=np.array(self.nuclear_charges)
-        if weighted: charges=np.sqrt(charges)
-        return np.sum([   [c/np.sum(charges)*coord] for c,coord in zip(charges,coords)   ], axis=0)[0]
-        #    , axis=0
-    def to_dict(self):
-        dic={
-            'coordinates':self.coordinates.tolist(),
-            'atom_types': self.atom_types,
-            'charge': self.charge,
-            'multiplicity': self.multiplicity,
-            'length_units': self.units.LENGTH,
-        }
-        return dic
+
 
 class rotate_multipoles():
     """ Cartesian is in from xx,yy,zz,xy,xz,yz
