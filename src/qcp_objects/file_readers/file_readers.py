@@ -1,6 +1,93 @@
 from . import *
 from qcp_global_utils.environment.file_handling import temporary_file
 
+from .file_reader_base import file_reader_2, enumline
+
+class pot_file_reader(file_reader_2):
+    """ Reader for C12.pot files """
+    pairs:  List[Tuple[str,str]]|None =None
+    coeffs: List[List[int]]|None=None
+    values: List[List[Tuple[str,str,int,List[float]]]]|None=None
+    def __init__(self, inp_fi:pdtc_file|None=None, **kwargs):
+        super().__init__(inp_fi=inp_fi, **kwargs)
+        self.read_file()
+class pot_file_reader(pot_file_reader):
+    def read_file(self):
+        header_identifier= r".*" + "".join(f" C{n}\\s*" for n in range(6,7)) + r'.*[\s]*$'
+        header_lineno=self.get_line_no(match = header_identifier, fullmatch=False) 
+        end_lineno=self.get_line_no(match=r'[/s]*END', fullmatch=False, single=False, case_sensitive=False)
+        @val_call
+        def process_header(line:enumline) -> Tuple[str,str,List[int]]:
+            lineno=line.no
+            the_line=line.line
+            try:
+                type1,type2, *coeffs = the_line.split()
+                num_coeffs=len(coeffs)
+                C_coeffs=[]
+                assert num_coeffs > 0, f"No coefficients found in line {lineno}: {the_line}"
+                for c in coeffs:
+                    assert c[0]=='C'
+                    val=int(c[1:])
+                    val>=6
+                    C_coeffs.append(val)
+                return type1, type2, C_coeffs
+            except Exception as e:
+                print(f"Error processing line {lineno}: {e}")
+        
+        pairs=[]
+        coeffs=[]
+        for lineno in header_lineno:
+            the_line=self.lines_nocom[lineno]
+            type1, type2, C_coeffs=process_header(the_line)
+            pairs+= [ (type1, type2) ]
+            coeffs+= [ C_coeffs ]
+        
+        blocks=[ ]
+        for lineno in header_lineno:
+            ends=[ x for x in end_lineno if x>lineno ]
+            assert len(ends)>0, f"No END found after header line {lineno}"
+            block_end=ends[0]
+            blocks.append(
+                (lineno+1, block_end)
+            )
+
+        def process_line(line:enumline):
+            lineno=line.no
+            the_line=line.line
+            try:
+                mul1, mul2, rank, *values=the_line.split()
+                for m in [mul1, mul2]:
+                    regex=r'[0-9]{2}[cs]?'
+                    assert re.fullmatch(regex, m), f"Expected tag {mul1} to match {regex} in line {lineno}: {the_line}"
+                rank=int(rank)
+
+                assert len(values)>0, f"No values found in line {lineno}: {the_line}"
+                values=[ float(x) for x in values]
+
+                print(values)
+                return mul1, mul2, rank, values
+            except Exception as e:
+                raise Exception(f"Error processing line {lineno}: {e}")
+
+        the_values=[]
+        for i,b in enumerate(blocks):
+            start, end = b
+            val_block=[]
+            for lineno in range(start, end):
+                the_line=self.lines_nocom[lineno]
+                mul1,mul2,rank,values=process_line(the_line)
+                assert len(values)==len(coeffs[i]), f"Number of values {len(values)} does not match number of coefficients {len(coeffs[i])} in block {i} line {lineno}"
+                val_block.append((mul1,mul2,rank,values))
+            the_values.append(val_block)
+
+        self.pairs=pairs
+        self.coeffs=coeffs
+        self.values=the_values
+
+        print (self.pairs, self.coeff)
+
+
+
 class file_reader():
     lines=None
     lines_no=None

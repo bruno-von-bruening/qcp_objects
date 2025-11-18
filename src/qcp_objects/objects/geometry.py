@@ -1,10 +1,13 @@
 from . import *
 
+log=logging.getLogger(__name__)
+from warnings import warn
+
 coor_ty=List[Tuple[float,float,float]]
 
 from rdkit.Chem import rdmolfiles, Mol, rdDetermineBonds, Mol as RDMol, rdmolops, MolFromXYZBlock
 
-class geometry_hidden(BaseModel):
+class geometry_hidden(myBaseModel):
     ifi: str|None=None
     units: my_units # Controls only input/output units
     atom_types: List[str]|None=None
@@ -54,15 +57,28 @@ class geometry_hidden(BaseModel):
         if input_provided:
             assert inp is not None, f"Input file is None"
             check_input(inp)
-            kwargs.update(dict(ifi=inp))
-            kwargs=read_input_file(inp)
+            kwargs.update(ifi=inp)
+            new_kwargs=read_input_file(inp)
+            for k,v in new_kwargs.items():
+                if k in kwargs.keys():
+                    if kwargs[k]==v:
+                        pass
+                    else:
+                        if not kwargs[k] is None:
+                            warn(f"Found key {k} both from input file and from kwargs. Using value from kwargs: {kwargs[k]}")
+                        kwargs.update({k:kwargs[k]})
+                else:
+                    kwargs.update({k:v})
+        
         else:
             if not ('coordinates' in kwargs.keys() or 'atom_types' in kwargs.keys()):
                 raise Exception(f"No input file provided buat also no coordinates/atom types. Provided: {kwargs.keys()}")
+            # if 'units' in kwargs.keys():
+            #     if 'LENGTH'
             if not  ('length_units' in kwargs.keys()):
                 raise Exception(f"Need to provide length unit when coordinates are read in over options")
             else:
-                length_units=kwargs['length_units']
+                length_units=kwargs.pop('length_units')
                 assert length_units in allowed_length_units
                 kwargs.update({'units':{'LENGTH':length_units}})
 
@@ -182,9 +198,10 @@ class geometry_hidden(geometry_hidden):
     @property
     def nuclear_charges(self):
         return [ element_symbol_to_nuclear_charge(x) for x in self.atom_types]
-    def print_out(self, output_name=None, format='xyz'):
+    def print_out(self, output_name=None, format='xyz', handle_extension=True):
         if format=='xyz':
             self.units.LENGTH='ANGSTROM'
+            if handle_extension: output_name=output_name.replace('.xyz','')+'.xyz'
             writer=xyz_writer(output_name, write=True, coordinates=self.coordinates, 
                     atom_types=self.atom_types, comment='Generated automatically')
         elif format=='txyz':

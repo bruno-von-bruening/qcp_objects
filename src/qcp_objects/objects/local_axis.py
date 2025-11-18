@@ -98,6 +98,7 @@ class local_axis_frame_constructor(BaseModel):
             x=global_ax('x','x')
             return [z,x]
         def orient_bisector(i1,i2,i3):
+            # Z should be negative bisector but orient does not allow that
             log.warning("Orienting with bisector should be negative (-Z)")
             z=bisector('z',i1,i2,i3)
             x=direct('x',i1,i3)

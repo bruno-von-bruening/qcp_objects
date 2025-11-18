@@ -3,10 +3,15 @@ from .grids import molecular_isodensity_grid
 import copy
 from typing import Literal
 from qcp_objects.file_readers.camcasp_reader import read_mom_file
+from qcp_objects.objects.polarisabilities.polarisability import polarizability_tensor
 
 
 from .geometry import geometry_hidden
 from .local_axis import local_axis_frame_constructor
+
+from .polarisabilities.polarisability import Pairwise_Polarizabilities
+from .polarisabilities.localised_polarisabilities import Localized_Distributed_Polarizabilities
+
 
 # Include dependencies to other object e.g. multipoles
 class geometry(geometry_hidden):
