@@ -2,6 +2,7 @@ from ...objects.polarisabilities import *
 from . import *
 
 from qcp_objects.math_objects.multipoles import num_elements_per_rank, triangular_index
+from itertools import permutations
 
 allowed_representation=Literal['S','C']
 
@@ -76,21 +77,21 @@ def polarizabilities_from_dict(
     @val_call
     def flat_key(key:str, ranks:List[int])->int:
         """ identifies the position of key e.g. (xx) within a flatt and concatenated multipole tensor"""
-        ints=key_mapper(key)
+        try:
+            ints=key_mapper(key)
 
-        rank=len(ints)
-        if symmetrize and len(ints)>1:
-            i,j=ints
-            if ints[0]>ints[1]:
-                raise Exception(f"Expected upper triangular form, got {ints}")
-            local_ind= j * (j + 1) // 2 + i
-        else:
-            local_ind=sum( ints[i]*3**(rank-i-1) for i in range(rank)) # first should be small!
-        ind=sum(
-            num_elements_per_rank(i,rep='C',symm=symmetrize) for i  in [ 
-                r for r in ranks if r<rank 
-            ]
-        )+local_ind
+            rank=len(ints)
+            if symmetrize and len(ints)>1:
+                local_ind = triangular_index(*ints)
+            else:
+                local_ind = sum(ints[i] * 3**(rank-i-1) for i in range(rank))  # first should be small!
+            ind=sum(
+                num_elements_per_rank(i,rep='C',symm=symmetrize) for i  in [ 
+                    r for r in ranks if r<rank 
+                ]
+            )+local_ind
+        except Exception as ex:
+            raise Exception(f"Could not make flat key for {key} with ranks {ranks}, {ints}: {ex}") from ex
 
         return ind
 
@@ -130,17 +131,24 @@ def polarizabilities_from_dict(
                             uniques={}
                             small_sel=[ the_sel for the_sel in sel if the_sel[f"{outer}_val"]==outer_val]
                             for s in small_sel:
-                                choices=sorted( [s[f"{inner}_val"], ''.join(reversed(list(s[f"{inner}_val"])))], key=lambda x:list(x) )
+                                #choices=sorted( [s[f"{inner}_val"], ''.join(reversed(list(s[f"{inner}_val"])))], key=lambda x:list(x) )
+                                base = s[f"{inner}_val"]
+                                # enumerate all unique permutations that have the same counts of x,y,z
+                                choices = sorted(
+                                    {''.join(p) for p in permutations(base)},
+                                    key=lambda x: list(x)
+                                )
                                 identified=choices[0]
 
                                 if not identified in uniques.keys():
                                     found=[ ss for ss in small_sel if ss[f"{inner}_val"] in choices ]
-                                    if len(found)==1:
-                                        val=found[0]['val']
-                                    elif len(found)==2:
-                                        dif=found[1]['val']-found[0]['val']
-                                        assert abs(dif)<thres, f"Difference larger {thres}: {dif}"
-                                        val=found[0]['val']+dif/2
+                                    if len(found)>0:
+                                        vals=[ ss['val'] for ss in found ]
+                                        avg=sum(vals)/len(vals)
+                                        difs=[ abs(v-avg) for v in vals ]
+                                        assert all( d<thres for d in difs), f"Difference larger {thres}: {difs}"
+                                        val=avg
+                                    
                                     else: raise Exception(found)
 
                                     uniques.update({ identified : s})
@@ -171,23 +179,31 @@ def polarizabilities_from_dict(
     ]
 
 
-    pairs_in_int=[
-        ( tuple([ flat_key(p[i], ranks) 
-                for i,ranks in enumerate([ranks_ind, ranks_field])
-        ]), v)
-        for p,v in pairs 
-    ]
-    mat=np.zeros(shape)
-    
-    for (i,j),v in pairs_in_int:
-        if not (j,i) in [ x[0] for x in pairs_in_int]:
-            mat[j,i]=v
-        #    pass
-        #else:
-        #    found=[ x for x in pairs_in_int if x[0]==(j,i)]
-        #    assert len(found)==1
-        #    v=(v+found[0][1])/2
-        mat[i,j]=v
+    pairs_in_int=[]
+
+    for p,v in pairs:
+        try:
+            pairs_in_int.append((
+                tuple([ flat_key(p[i], ranks) 
+                        for i,ranks in enumerate([ranks_ind, ranks_field])
+                ]), v)
+            )
+        except Exception as ex:
+            raise Exception(f"Could not process pair {p} with value {v}: {ex}\n{pairs}") from ex
+
+    try:
+        mat=np.zeros(shape)
+        
+        for (i,j),v in pairs_in_int:
+            if not (j,i) in [ x[0] for x in pairs_in_int]:
+                mat[i,j]=v
+            #    pass
+            #else:
+            #    found=[ x for x in pairs_in_int if x[0]==(j,i)]
+            #    assert len(found)==1
+            #    v=(v+found[0][1])/2
+            mat[i,j]=v
+    except Exception as ex: raise Exception(f"Could not build matrix of shape {shape}: {ex}") from ex
 
 
 
@@ -260,6 +276,8 @@ class polarizability_tensor(polarizability_tensor):
                     trace=np.sum([vec[ind+start] for ind in indices])
                     for ind in indices:
                         vec[ind+start]-=trace/3
+                elif r>1:
+                    raise NotImplementedError(f"Traceless for rank {r} not implemented yet")
                 start+=length
             mat[:,j]=vec
 

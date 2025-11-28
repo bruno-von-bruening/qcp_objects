@@ -1,7 +1,3 @@
-try: # rich only acts on printout so its entirely options
-    from rich.traceback import install
-    install(suppress=[ 'pydantic', 'pydantic_core' ])
-except Exception as ex: pass 
 
 import re
 
