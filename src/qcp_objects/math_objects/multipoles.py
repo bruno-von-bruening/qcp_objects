@@ -24,19 +24,11 @@ def num_elements_per_rank(rank:int,rep:allowed_representation,symm:bool=False) -
 
 @val_call
 def triangular_index(*ints: int) -> int:
-    """Return a flat index for a symmetric Cartesian tensor index tuple.
+    """ Lower triangular matrix!!!"""
+    if len(ints) == 0: raise ValueError("triangular_index requires at least one index")
 
-    For 2 indices (i, j) with i >= j this reduces to the usual
-    upper-triangular indexing i*(i+1)//2 + j.
-
-    For more than 2 indices, it treats `ints` as a non-increasing tuple
-    (symmetric tensor index) and computes a combinatorial index.
-    """
-    if len(ints) == 0:
-        raise ValueError("triangular_index requires at least one index")
-
-    # Enforce non-increasing order: no index larger than the previous one
-    if not all(ints[k] >= ints[k - 1] for k in range(1, len(ints))):
+    # Enforce Decreasing order: essential for correct indexing (lower triangular)
+    if not all(ints[k] >= ints[k + 1] for k in range(len(ints) - 1)):
         raise Exception(f"Expected non-increasing (symmetric) ordering, got {ints}")
 
     # Rank-1: just return the index itself
@@ -46,7 +38,7 @@ def triangular_index(*ints: int) -> int:
     # Rank-2: standard upper-triangular indexing with i >= j
     if len(ints) == 2:
         i, j = ints
-        return i * (i + 1) // 2 + j
+        return (i * (i + 1)) // 2 + j
     elif len(ints) == 3:
         i, j, k = ints
         return (i * (i + 1) * (i + 2)) // 6 + (j * (j + 1)) // 2 + k

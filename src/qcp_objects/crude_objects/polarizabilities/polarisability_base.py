@@ -82,7 +82,7 @@ def polarizabilities_from_dict(
 
             rank=len(ints)
             if symmetrize and len(ints)>1:
-                local_ind = triangular_index(*ints)
+                local_ind = triangular_index(*reversed(ints)) # provided as upper triangular but I store as lower!
             else:
                 local_ind = sum(ints[i] * 3**(rank-i-1) for i in range(rank))  # first should be small!
             ind=sum(
@@ -102,7 +102,8 @@ def polarizabilities_from_dict(
         assert re.fullmatch(reg, key), f"Got key {key}, expected something of form {reg}"
         return key.split('@')
 
-    pairs=[ (cartesian_description(k),v) for k,v in inp.items()]
+    pairs=sorted([ (cartesian_description(k),v) for k,v in inp.items()], key=lambda x: x[0] )
+
 
     if symmetrize:
         blocks=[]
@@ -139,6 +140,7 @@ def polarizabilities_from_dict(
                                     key=lambda x: list(x)
                                 )
                                 identified=choices[0]
+
 
                                 if not identified in uniques.keys():
                                     found=[ ss for ss in small_sel if ss[f"{inner}_val"] in choices ]
@@ -181,6 +183,8 @@ def polarizabilities_from_dict(
 
     pairs_in_int=[]
 
+
+
     for p,v in pairs:
         try:
             pairs_in_int.append((
@@ -190,6 +194,7 @@ def polarizabilities_from_dict(
             )
         except Exception as ex:
             raise Exception(f"Could not process pair {p} with value {v}: {ex}\n{pairs}") from ex
+
 
     try:
         mat=np.zeros(shape)
@@ -216,9 +221,10 @@ def polarizabilities_from_dict(
     # def symmetrize(self,thres=1.e-10) -> polarizability_tensor:
     #     mat=self.mat
 
+    mat_flat=mat.reshape(-1).tolist()
 
     return dict( # format of polarisability tensor
-        tensor_elements=mat.reshape(-1).tolist(),
+        tensor_elements=mat_flat,
         symmetrized=symmetrize,
         induced_ranks=ranks_ind,
         induced_representation='C',
@@ -271,12 +277,30 @@ class polarizability_tensor(polarizability_tensor):
             start=0
             for r in self.induced_ranks:
                 length=self.representation_vector_length(self.induced_representation, [r], self.symmetrized)
-                if r==2:
+                if r<2:
+                    pass
+                elif r==2:
                     indices=[ triangular_index(i,i) for i in range(3) ]
                     trace=np.sum([vec[ind+start] for ind in indices])
                     for ind in indices:
                         vec[ind+start]-=trace/3
-                elif r>1:
+                elif r==3:
+                    warn("Traceless for rank 3 skipped for now")
+                    # for ind in np.indices( 3*[length]):
+                    #     a,b,c=ind
+                    #     if a<=b and b<=c:
+                    #         pass
+                    #     else:
+                    #         ind=triangular_index(a,b,c)
+                    #         # Formula is 
+                    #         vec[ind+start]-= np.linalg.norm([a,b,c])**2 * (
+                    #             (c if a==b else 0)+
+                    #             (b if a==c else 0)+
+                    #             (a if b==c else 0) 
+                    #         )/5
+                elif r==4:
+                    warn("Traceless for rank 4 skipped for now")
+                else:
                     raise NotImplementedError(f"Traceless for rank {r} not implemented yet")
                 start+=length
             mat[:,j]=vec
