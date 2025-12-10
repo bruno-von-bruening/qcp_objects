@@ -12,6 +12,8 @@ from .local_axis import local_axis_frame_constructor
 from .polarisabilities.polarisability import Pairwise_Polarizabilities
 from .polarisabilities.localised_polarisabilities import Localized_Distributed_Polarizabilities
 
+from qcp_objects.objects.multipoles.molecular_multipole_moment import MolecularMultipoleMoments
+
 
 # Include dependencies to other object e.g. multipoles
 class geometry(geometry_hidden):

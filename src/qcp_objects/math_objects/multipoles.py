@@ -56,3 +56,37 @@ def triangular_index(*ints: int) -> int:
     for k, ik in enumerate(ints):
         flat += comb(ik + r - k, r - k)
     return flat
+def key_mapper(key):
+    if key=='0':
+        return []
+    else:
+        mapper=dict( 
+            (k,i) for i,k in enumerate(['x','y','z'])
+        )
+        return [ mapper[k] for k in key ]
+
+def symmetrize_tensor(di):
+    def get_unique_element(inp:str):
+        if isinstance(inp,str):
+            from itertools import permutations
+            choices = sorted(
+                {''.join(p) for p in permutations(inp)},
+                key=lambda x: list(x)
+            )
+            return choices[0]
+
+
+    unique_mapper={}
+    for k in di.keys():
+        unique_k=get_unique_element(k)
+        if not unique_k in unique_mapper.keys():
+            unique_mapper.update( { unique_k : [] } )
+        unique_mapper[unique_k].append(k)
+    
+    new_di={}
+    for k, keys in unique_mapper.items():
+        vals=[ di[key] for key in keys ]
+        avg=sum(vals)/len(vals)
+        assert all( abs( avg - v)<1.e-8 for v in vals), f"Difference larger than threshold in symmetrization for keys {keys} with values {vals}"
+        new_di.update( { k: avg } )
+    return new_di

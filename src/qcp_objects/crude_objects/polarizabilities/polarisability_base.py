@@ -4,7 +4,8 @@ from . import *
 from qcp_objects.math_objects.multipoles import num_elements_per_rank, triangular_index
 from itertools import permutations
 
-allowed_representation=Literal['S','C']
+from qcp_objects.math_objects import allowed_representation
+from qcp_objects.math_objects.multipoles import key_mapper
 
 
 class polarizability_single(myBaseModel):
@@ -65,14 +66,6 @@ def polarizabilities_from_dict(
     inp:Dict[str,float], symmetrize=True
 ) -> dict:
 
-    def key_mapper(key):
-        if key=='0':
-            return []
-        else:
-            mapper=dict( 
-                (k,i) for i,k in enumerate(['x','y','z'])
-            )
-            return [ mapper[k] for k in key ]
 
     @val_call
     def flat_key(key:str, ranks:List[int])->int:
