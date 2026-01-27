@@ -238,9 +238,11 @@ class polarizability_tensor(polarizability_tensor):
     def elements_per_rank(self,representation, rank,symm):
         return num_elements_per_rank(rank, rep=representation, symm=symm)
     def representation_vector_length(self,representation, ranks, symm):
-        return np.sum([ self.elements_per_rank(representation, n, symm) for n in ranks ])
+        return int(np.sum([ self.elements_per_rank(representation, n, symm) for n in ranks ]))
+
     @property
-    def expected_shape(self):
+    @val_call
+    def expected_shape(self) -> Tuple[int,int]:
         induced_length, field_length=[
             self.representation_vector_length(rep, rank, self.symmetrized)
             for rep,rank in [
