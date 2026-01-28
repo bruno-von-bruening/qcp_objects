@@ -523,50 +523,87 @@ class read_xyz_file(geometry_reader):
     def  __init__(self, inp_fi):
         super().__init__(inp_fi)
         self.extract_data()
-    def extract_data(self):
-        empty_lines=self.get_line_no(match=r'[ ]*', fullmatch=True)
-        first_line=self.lines[0]
-        try:
-            site_number=int(first_line.strip())
-        except Exception as e:
-            raise Exception(f"Cannot convert to integer : \'{first_line.strip()}\'")
+    def extract_qchem_xyz(self):
+        """ Read qchem xyz file format 
+        $molecule
+        <charge> <multiplicity>
+        <atom_type> <x> <y> <z>
+        $end
+        """
+        # truncate empty lines at begining and end
+        lines=[ (i,l) for (i,l) in self.lines_num_nocom if l.strip()!='' ]
+        assert len(lines)>=4, f"Expected at least four lines in xyz file but found:\n{self.lines_nocom}"
+        assert lines[0][1].startswith('$molecule'), f"Expected first line to start with $molecule but found:\n{lines[0][1]}"
+        assert lines[-1][1].endswith('$end'), f"Expected last line to end with $end but found:\n{lines[-1][1]}"
 
-        # Comment
-        comment_line = self.lines[1].strip()
-        if comment_line != '':
-            comments=comment_line
-        
-        at_ty_search=r'^\s*[A-Z][a-z,A-Z]? '
-        at_lines=self.get_line_no(match=at_ty_search, fullmatch=False)
-        if len(at_lines)==0:
-            raise Exception(f"Could not read atom lines in {self.input_file}")
-        if len(at_lines)!=site_number:
-            raise Exception(f"XYZ file \'{self.input_file}\'should contain {site_number} of sites according to info, "+
-                    f"but found {len(at_lines)}")
-        
-        atom_types=[]
-        coordinates=[]
-        for line in [ self.lines_nocom[i] for i in at_lines]:
-            ar=line.split()
-            if len(ar)!=4:
-                raise Exception(f"Expected 4 element on line but found\n{line}")
-            
-            match=re.match(r'[A-Z][a-z]?', ar[0])
-            if not bool(match):
-                raise Exception(f"Could not finnd atom:\n{ar[0]}")
-            at_ty=ar[0]
-            if len(at_ty)==2:
-                at_ty=at_ty[0].upper()+at_ty[1].lower()
-            atom_types.append(at_ty)
+        body=lines[1:-1]
+        assert re.fullmatch(r"[-+]?\d[ ]+\d", body[0][1].strip()), f"Expected line to match format '-+?d[ ]+d' but found:\n{body[0][1].strip()}"
 
+        atom_types, coordinates=[],[]
+        for i,line in body[1:]:
+            ar=line.strip().split()
+            assert len(ar)==4, f"Expected 4 elements on line but found {len(ar)}:\n{line}"
+            match=re.match(r'[A-Z][a-z]?[0-9]*', ar[0])
+            assert bool(match), f"Could not indentify as atom type:\n{ar[0]}"
+            atty=ar[0].rstrip(''.join([ str(x) for x in range(10)])) # strip all number
             try:
                 coor=ar[1:]
                 coor=[ float(x) for x in coor ]
             except:
                 raise Exception(f"{coor}")
+            atom_types.append(atty)
             coordinates.append(coor)
-        
-        coordinates=np.array(coordinates)
+        return atom_types, np.array(coordinates)
+
+    def extract_data(self):
+        if self.lines_nocom[0].startswith('$molecule'):
+            atom_types, coordinates=self.extract_qchem_xyz()
+        else:
+
+
+            empty_lines=self.get_line_no(match=r'[ ]*', fullmatch=True)
+            first_line=self.lines[0]
+            try:
+                site_number=int(first_line.strip())
+            except Exception as e:
+                raise Exception(f"Cannot convert to integer : \'{first_line.strip()}\'")
+
+            # Comment
+            comment_line = self.lines[1].strip()
+            if comment_line != '':
+                comments=comment_line
+            
+            at_ty_search=r'^\s*[A-Z][a-z,A-Z]? '
+            at_lines=self.get_line_no(match=at_ty_search, fullmatch=False)
+            if len(at_lines)==0:
+                raise Exception(f"Could not read atom lines in {self.input_file}")
+            if len(at_lines)!=site_number:
+                raise Exception(f"XYZ file \'{self.input_file}\'should contain {site_number} of sites according to info, "+
+                        f"but found {len(at_lines)}")
+            
+            atom_types=[]
+            coordinates=[]
+            for line in [ self.lines_nocom[i] for i in at_lines]:
+                ar=line.split()
+                if len(ar)!=4:
+                    raise Exception(f"Expected 4 element on line but found\n{line}")
+                
+                match=re.match(r'[A-Z][a-z]?', ar[0])
+                if not bool(match):
+                    raise Exception(f"Could not finnd atom:\n{ar[0]}")
+                at_ty=ar[0]
+                if len(at_ty)==2:
+                    at_ty=at_ty[0].upper()+at_ty[1].lower()
+                atom_types.append(at_ty)
+
+                try:
+                    coor=ar[1:]
+                    coor=[ float(x) for x in coor ]
+                except:
+                    raise Exception(f"{coor}")
+                coordinates.append(coor)
+            
+            coordinates=np.array(coordinates)
         self.atom_types=atom_types
         self.coordinates=coordinates
     @validate_call
