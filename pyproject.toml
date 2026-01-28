@@ -1,6 +1,6 @@
 [project]
 name = "qcp_objects"
-version = "0.1.04"
+dynamic=['version'] # Handled through setuptools-scm
 description = ''
 readme = "README.md"
 requires-python = ">=3.8"
@@ -9,8 +9,9 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
-#dependencies = [
-#   "sqlmodel",
-#   "numpy",
-#   "pubchempy",
-#]
+[tool.setuptools_scm]
+version_file = "src/qcp_objects/_version.py" # Make a version file (can the be used by this very package)
+
+[build-system]
+requires = ["setuptools>=80", "wheel", "setuptools_scm>=8"]
+build-backend = "setuptools.build_meta"

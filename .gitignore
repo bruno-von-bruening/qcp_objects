@@ -5,3 +5,6 @@ build/
 build.back/
 dist/
 add_to_shell_init.txt
+
+src/qcp_objects/_version.py
+sandbox/**
