@@ -75,8 +75,9 @@ class geometry_hidden(myBaseModel):
                 raise Exception(f"No input file provided buat also no coordinates/atom types. Provided: {kwargs.keys()}")
             # if 'units' in kwargs.keys():
             #     if 'LENGTH'
-            if not  ('length_units' in kwargs.keys()):
-                raise Exception(f"Need to provide length unit when coordinates are read in over options")
+            len_un_key='length_units'
+            if not  (len_un_key in kwargs.keys()):
+                raise Exception(f"Need to provide length unit when coordinates are read in over options (Should be done through key \'{len_un_key}\')")
             else:
                 length_units=kwargs.pop('length_units')
                 assert length_units in allowed_length_units
