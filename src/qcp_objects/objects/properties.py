@@ -50,7 +50,7 @@ class rotate_multipoles():
     def rotate_quick(self, array):
 
         BOHR_TO_ANGSTROM = 1./0.52917721067
-        matrices=self.get_mat_sph_to_crt_stone()
+        matrices=type(self).get_mat_sph_to_crt_stone()
         assert any([len(array)==x**2 for x in range(1,10)])
         max_rank, ranges=self.get_min_rank(array)
         assert len(matrices)>=max_rank, f"{len(matrices)}, {max_rank}"
@@ -83,8 +83,8 @@ class rotate_multipoles():
         if not found:
             raise Exception(len(array), lev_ind)
 
-        
-    def get_mat_sph_to_crt_stone(self):
+    @classmethod
+    def get_mat_sph_to_crt_stone(cls):
         """ Provides Matrices to convert spherical representation to cartesian representation in stones definition for a given multipolar rank
         see Theory of Intermolecular Forces, Stone, Second Edition (2013), p.287
         return a list of matrices, one for each rank from monopoles to hexadecapoles

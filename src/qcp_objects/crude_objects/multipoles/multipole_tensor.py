@@ -25,6 +25,8 @@ class multipoles_base(myBaseModel):
     def matrix(self):
         return np.array(self.tensor_elements).reshape( self.get_shape(self.rank) )
 
+
+
     @val_call
     def from_dict(self,di:Dict[str,float], symm:bool=False):
         """ Assumes a dict with """
@@ -76,6 +78,52 @@ class molecular_multipoles_base(myBaseModel):
     tensor_elements: List[float]
     symmetrized: List[bool]|bool = False
     representation: List[allowed_representation]|allowed_representation
+
+    # def get_shape(self, rank, symm:bool|None=None):
+    #     if symm is None:
+    #         symm=self.symmetrized
+    #     
+    #     if not symm:
+    #         shape= [3]*rank
+    #     else:
+    #         shape= [num_elements_per_rank(rank,self.representation, symm=True)]*rank
+    #     return shape
+
+    # @property
+    # def matrix(self):
+    #     return np.array(self.tensor_elements).reshape( self.get_shape(self.rank) )
+    @property
+    def slices(self):
+        if isinstance(self.representation,str): rep=[self.representation]*len(self.ranks)
+        else: rep=self.representation
+        if isinstance(self.symmetrized, bool): syms=[self.symmetrized]*len(self.ranks)
+        else: sysm=self.symmetrized
+        slices_base=[ num_elements_per_rank(i,rep,symm=sym) for i,rep,sym in zip(self.ranks,rep,syms) ]
+        slices=[ (sum(slices_base[0:j]),sum(slices_base[0:j])+slices_base[j]) for j in range(len(slices_base))]
+        return slices
+
+    def write_orient_moment_file(self,expansion_center=[0,0,0], output_file='mom_dummy.mom'):
+        assert isinstance(self.representation,str)
+        if not self.symmetrized: raise NotImplementedError
+        ar=[ self.tensor_elements[s:e] for s,e in self.slices ]
+        if self.representation=='S':
+            pass
+        else:
+            from qcp_objects.objects.properties import rotate_multipoles
+            mats=rotate_multipoles.get_mat_sph_to_crt_stone()
+
+            ar_new=[]
+            for x,rk in zip(ar,self.ranks):
+                ar_new+=[np.array(x)@mats[rk]]
+            ar=ar_new
+        
+        new_ar=[] if 0 in self.ranks else [0]
+        assert {1,2,3,4}.issubset(set(self.ranks)) # expect mono to hexadecapoles for orient
+        for a in ar: new_ar+=a.tolist()
+
+        from qcp_objects.objects.properties import custom_mtp_mom_file
+        custom_mtp_mom_file(output_file,[1],[ new_ar],[expansion_center],)
+        return output_file
     
     def from_dict(self,di:Dict[str,float], symmetrize:bool=True):
         """ Assumes a dict with shape 'xx':'value' """
