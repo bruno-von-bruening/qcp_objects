@@ -64,7 +64,6 @@ class pot_file_reader(pot_file_reader):
                 assert len(values)>0, f"No values found in line {lineno}: {the_line}"
                 values=[ float(x) for x in values]
 
-                print(values)
                 return mul1, mul2, rank, values
             except Exception as e:
                 raise Exception(f"Error processing line {lineno}: {e}")
@@ -940,7 +939,6 @@ class read_camcasp_basis(file_reader):
         for i, value_no in link_type_to_value.items():
             type_line=self.lines_nocom[i]
             if not re.match(r'^[ ]*[1][ ]*[s][ ]*$', type_line):
-                print('check')
                 continue
             for j in value_no:
                 value_line=self.lines[j]

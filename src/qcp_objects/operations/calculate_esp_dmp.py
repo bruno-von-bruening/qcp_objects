@@ -14,7 +14,8 @@ from qcp_objects.objects.properties import multipoles as mom_cl
 # import mod_database as m_db, mod_io as m_io, mod_encoder as m_enc, mod_geometry as m_geo
 
 @validate_call
-def calculate_esp_dmp(multipoles: file, grid: file, ranks: List[int]|str='all_available'):
+def calculate_esp_dmp(multipoles: file, grid: file, ranks: List[int]|str='all_available',
+                      ofile=None):
     """"""
 
     # Read into py-objects 
@@ -22,7 +23,7 @@ def calculate_esp_dmp(multipoles: file, grid: file, ranks: List[int]|str='all_av
     grid=isod_grid_cl(grid)
     # Evaluate the moments
     total_grid, individual_grids=mom.eval_on_grid(grid, ranks=ranks)
-    final_file=total_grid.to_file(onam='test.map.json',format='json')
+    final_file=total_grid.to_file(onam='test.map.json' if ofile is None else ofile,format='json')
 
     results=dict(
         files={

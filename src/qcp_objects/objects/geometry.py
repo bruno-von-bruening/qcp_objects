@@ -5,7 +5,12 @@ from warnings import warn
 
 coor_ty=List[Tuple[float,float,float]]
 
-from rdkit.Chem import rdmolfiles, Mol, rdDetermineBonds, Mol as RDMol, rdmolops, MolFromXYZBlock
+try:
+    from rdkit.Chem import rdmolfiles, Mol, rdDetermineBonds, Mol as RDMol, rdmolops, MolFromXYZBlock
+    LOADED_RDKIT=True
+except Exception as ex:
+    LOADED_RDKIT=False
+    warn(f"Could not load rdkit, might raise problem for certain functionalities later on")
 
 class geometry_hidden(myBaseModel):
     ifi: str|None=None
@@ -141,17 +146,19 @@ class geometry_hidden(geometry_hidden):
 
     def connec(self):
         def get_rdkit_mol():
-            if type(self.ifi) != type(None):
+            if self.ifi is not None and self.ifi.lower().endswith('.xyz'):
                 raw_mol = rdmolfiles.MolFromXYZFile(self.ifi)
                 rdmol = RDMol(raw_mol)
             else:
                 self.units.LENGTH='ANGSTROM'
-                mol_block=f"{len(self.coordinates)}\n\n"
+                mol_block=f"{len(self.coordinates)}\nDummy Comment\n"
                 for ty,coor in zip( self.atom_types, self.coordinates):
                     bohr_to_angstrom=0.529177249
-                    coor=[f"{float(x)}" for x in coor]
+                    coor=[f"{float(x):.8f}" for x in coor]
                     mol_block+=f"{ty} {' '.join(coor)}\n"
-                rdmol=MolFromXYZBlock(mol_block)
+                mol_block=mol_block.strip()
+                rdmol=MolFromXYZBlock(mol_block.strip('\n'))
+                if rdmol is None: raise Exception(f"\'{mol_block}\'")
             return rdmol
         rdmol=get_rdkit_mol()
         rdDetermineBonds.DetermineBonds(rdmol, charge=0)

@@ -17,4 +17,6 @@ class MolecularMultipoleMoments(molecular_multipoles_base):
     expansion_center: Tuple[float,float,float]
     type_of_center: allowed_centers|None=None
 
+    # Maybe I need internal rzepresentation
+
 
