@@ -2,6 +2,8 @@
 from . import *
 from qcp_global_utils.environment.file_handling import temporary_file
 
+from qcp_objects.util.import_helper import myBaseModel
+
 enumline=Tuple[int, str]
 class enumline():
     no: int
@@ -10,9 +12,7 @@ class enumline():
         self.no=no
         self.line=line
 
-class file_reader_2(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+class file_reader_2(myBaseModel):
     file_path: pdtc_file|None = None # input file
     comtag: str|None = None # 
     lines: List[enumline]|None = None # list of lines

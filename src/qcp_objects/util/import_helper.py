@@ -10,10 +10,18 @@ import numpy as np, os, sys
 from qcp_global_utils.pydantic.pydantic import pdtc_file
 from qcp_global_utils.environment.file_handling import load_json_or_yaml, is_json_or_yaml 
 
+
+from pydantic import ConfigDict
 class myBaseModel(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config=ConfigDict(
+        arbitrary_types_allowed = True,
         extra = 'forbid'
+    )
+
+    if False: # Old and will be depreceated, pushes warning.
+        class Config:
+            arbitrary_types_allowed = True
+            extra = 'forbid'
 
 import logging
 log=logging.getLogger(__name__)

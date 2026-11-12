@@ -2,15 +2,14 @@
 from . import *
 
 from qcp_objects.util.util import load_json
+from qcp_objects.util.import_helper import myBaseModel
 
-class molecular_isodensity_grid_meta(BaseModel):
+class molecular_isodensity_grid_meta(myBaseModel):
     num_vertices: int=-1
     num_faces: int=-1
     iso_density_value: float
 
-class molecular_isodensity_grid_data(BaseModel):
-    class Config:
-        arbitrary_types_allowed=True
+class molecular_isodensity_grid_data(myBaseModel):
     input_file: str | None = None
     output_file: str | None = None
     vertices: mynpar
@@ -19,7 +18,14 @@ class molecular_isodensity_grid_data(BaseModel):
     meta: molecular_isodensity_grid_meta
     def __init__(self, *args, **kwargs):
         if not 'iso_density_value' in kwargs.keys(): raise Exception(f"{kwargs.keys()}")
-        kwargs.update({'meta':molecular_isodensity_grid_meta(*args,**kwargs)})
+
+        meta_kwargs=dict()
+        for k,v in kwargs.items():
+            if k in molecular_isodensity_grid_meta.model_fields.keys():
+                meta_kwargs.update({k:v})
+        for k in meta_kwargs.keys():
+            del kwargs[k]
+        kwargs.update({'meta':molecular_isodensity_grid_meta(*args,**meta_kwargs)})
         super().__init__(*args, **kwargs)
         self.meta.num_vertices=len(self.vertices)
         self.meta.num_faces=len(self.faces)
@@ -152,7 +158,7 @@ class molecular_isodensity_grid(molecular_isodensity_grid_data):
         new_map=interaction_map(inp=self , scalars=scalars, energy_units=energy_units)
         return new_map
 
-class statistical_indicators(BaseModel):
+class statistical_indicators(myBaseModel):
     avr: float 
     min: float 
     max: float
