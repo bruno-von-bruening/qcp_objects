@@ -30,7 +30,7 @@ def read_sulley_local_axis_file(file)->List[ tinker_frame_types ]:
                 tuples.append(int_parts)
     return tuples
 
-class local_axis_frame_constructor(BaseModel):
+class local_axis_frame_constructor:
     definition: List[ tinker_frame_types ] # atom_index, axis_type, axis_atom_index
 
     def __init__(self,*args,**kwargs):
@@ -154,6 +154,6 @@ class local_axis_frame_constructor(BaseModel):
 
 
 #   Internal object accordint to Tinker definition
-# class local_axis_frame(BaseModel):
+# class local_axis_frame:
 #     atom_index: int
 #     description: str|None=None

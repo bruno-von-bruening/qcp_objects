@@ -1,9 +1,9 @@
 """ This function is for the mathematical constrcuction of grids!"""
 from . import *
 
-class math_radial_grid_base(BaseModel):
-    class Config:
-        arbitrary_types_allowed=True
+from qcp_global_utils.pydantic.pydantic import myBaseModel
+
+class math_radial_grid_base(myBaseModel):
     radial_points   : mynpar = np.array([])
     weights         : mynpar = np.array([])
     number_of_points : int=200
@@ -116,7 +116,7 @@ class Muray_Handy_Lamind_Euler_Maclaurin_Grid(math_radial_grid_base):
         
         return radial_points, radial_weights
 
-class math_angular_grid(BaseModel):
+class math_angular_grid(myBaseModel):
     spherical_points:  List[Tuple[float,float,float]] # Points on unit sphere that describe angular grid
     spherical_weights: List[float]|None=None
     @property
@@ -130,10 +130,8 @@ class math_angular_grid(BaseModel):
         return np.array(self.spherical_points), np.array(self.spherical_weights)
     
 
-class AtomicGrid(BaseModel):
+class AtomicGrid(myBaseModel):
     """ given a radial grid, angular grid(s) and an option for merging them (could have different angular grids for radial dependence) """
-    class Config:
-        arbitrary_types_allowed=True
     radial_grid     : Muray_Handy_Lamind_Euler_Maclaurin_Grid # allow for different ones here
     angular_grids   : List[math_angular_grid]|math_angular_grid
     angular_pruning : None = None 

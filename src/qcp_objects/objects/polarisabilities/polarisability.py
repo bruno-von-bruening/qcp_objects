@@ -19,7 +19,7 @@ from .. import *
 
 
 
-class Pairwise_Polarizabilities(BaseModel):
+class Pairwise_Polarizabilities:
     """
     Representation: Either list specifying each rank or string indicating all ranks
     PHYSICAL MEANING: Matrix of Induced mutlipole elements for external multipolar field elements

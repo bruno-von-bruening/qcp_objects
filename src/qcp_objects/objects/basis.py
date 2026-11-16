@@ -6,7 +6,7 @@ from qcp_objects.file_readers.camcasp_reader import read_camcasp_solution, read_
 
 from typing import Any
 
-class radial_atomic_basis(BaseModel):
+class radial_atomic_basis(myBaseModel):
     exponent_scales         : List[List[float]]
     exponent_orders         : List[List[float]]
     normalizations          : List[List[float]]
@@ -88,7 +88,7 @@ class radial_atomic_basis(radial_atomic_basis):
             'initials':np.array( [ 1./len(self.exponent_scales) for x in self.exponent_scales ] ).tolist(),
         }
         return horton_mapper
-class radial_atomic_grid(BaseModel):
+class radial_atomic_grid(myBaseModel):
     start: float=0
     end: float=10
     units:  Literal['au','ang','angstrom']='au'
@@ -196,7 +196,7 @@ class radial_atomic_basis(radial_atomic_basis):
         #         cleaned_dic.update({key:new_at[key]})
         # return cleaned_dic
 
-class molecular_basis(BaseModel):
+class molecular_basis(myBaseModel):
     atom_types      : List[str]|None=None
     basis_expansions: List[radial_atomic_basis]
     centers         : List[Tuple[float,float,float]]

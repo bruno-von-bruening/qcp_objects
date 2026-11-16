@@ -1,6 +1,6 @@
 from . import *
 
-class Radial_Weights(BaseModel):
+class Radial_Weights:
     coordinates_of_sites    : List[Tuple[float,float,float]]
     types_of_sites          : List[str]
 

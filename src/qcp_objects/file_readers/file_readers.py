@@ -392,7 +392,7 @@ class json_reader():
         
             
 
-class fchk_data(BaseModel):
+class fchk_data(myBaseModel):
     mode            : str|None=None # mode e.g. SP or FORCE
     method          : str|None=None # electronic structure method used
     basis           : str           # basis set used

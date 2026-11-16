@@ -33,7 +33,7 @@ from qcp_global_utils.environment.file_handling import load_json_or_yaml
 from qcp_global_utils.encoding_and_conversion.encoding import nuclear_charge_to_element_symbol, element_symbol_to_nuclear_charge
 
 allowed_length_units=['BOHR','ANGSTROM']
-class my_units(BaseModel):
+class my_units(myBaseModel):
     LENGTH: Literal[tuple(allowed_length_units)]='BOHR'
 
 from qcp_objects.file_readers.file_readers import fchk_reader , read_xyz_file

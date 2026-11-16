@@ -272,7 +272,7 @@ def custom_mtp_mom_file(filename,z_nums,mul_ar,coords=None, type='unspecified'):
             wr.write("\n")
         wr.write("\n")
 
-class multipoles_data(BaseModel):
+class multipoles_data(myBaseModel):
     atom_types: List[str|int]
     atom_coordinates: mynpar
     site_dmp_di: List
@@ -281,8 +281,6 @@ class multipoles_data(BaseModel):
     input_file: str
     _au_to_kj_mol=2625.49963947
     length_units: Literal[tuple(allowed_length_units)]='BOHR'
-    class Config:
-        arbitrary_types_allowed=True
     @property
     def ranks_list(self):
         if type(self.site_dmp_di)==type(None):
@@ -317,8 +315,6 @@ class multipoles_data(BaseModel):
         return max_rank
 
 class multipoles(multipoles_data):
-    class Config:
-        arbitrary_types_allowed=True
     def flatten_moment(self,mom):
         if isinstance(mom, dict):
             new_mom=[]
